@@ -85,7 +85,7 @@ echo "==> [5/8] Настройка SSH..."
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 # Порт оставляем 22 (reg.ru VDS стандартный)
-systemctl reload sshd
+systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
 echo "    ВНИМАНИЕ: root-вход по SSH теперь отключён."
 echo "    Для входа используй: ssh deploy@$DOMAIN"
 
