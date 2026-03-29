@@ -53,7 +53,14 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     return reply.status(401).send({ error: 'Unauthorized', message: 'Account inactive or not found' });
   }
 
-  request.user = user;
+  request.user = {
+    id: user.id,
+    email: user.email,
+    callsign: user.callsign,
+    role: user.role as unknown as UserRole,
+    cohort_id: user.cohort_id,
+    must_change_password: user.must_change_password,
+  };
 }
 
 export function roleGuard(...roles: UserRole[]) {
