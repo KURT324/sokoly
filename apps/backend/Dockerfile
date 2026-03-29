@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,6 @@ RUN npm run build
 
 # Generate Prisma client and build TypeScript
 WORKDIR /app/apps/backend
-RUN apk add --no-cache openssl openssl-dev
 RUN npx prisma generate
 RUN npm run build
 
