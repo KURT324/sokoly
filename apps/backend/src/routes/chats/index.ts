@@ -4,7 +4,7 @@ import fsSync from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
 import { v4 as uuidv4 } from 'uuid';
-import { UserRole } from '@eduplatform/shared';
+import { UserRole } from '@prisma/client';
 import { prisma } from '../../db';
 import { authGuard } from '../../middleware/authGuard';
 

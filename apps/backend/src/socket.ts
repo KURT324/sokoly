@@ -1,7 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { prisma } from './db';
-import { UserRole } from '@eduplatform/shared';
+import { UserRole } from '@prisma/client';
 
 interface SocketUser {
   id: string;

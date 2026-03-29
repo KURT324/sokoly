@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { UserRole } from '@eduplatform/shared';
+import { UserRole } from '@prisma/client';
 import { prisma } from '../../db';
 import { roleGuard } from '../../middleware/authGuard';
 

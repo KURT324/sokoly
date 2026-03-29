@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { UserRole } from '@eduplatform/shared';
+import { UserRole } from '@prisma/client';
 import { prisma } from '../../db';
 import { roleGuard } from '../../middleware/authGuard';
 
