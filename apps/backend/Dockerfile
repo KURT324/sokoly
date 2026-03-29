@@ -29,19 +29,21 @@ FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 # Copy shared package (must exist as symlink target for node_modules/@eduplatform/shared)
 COPY --from=builder /app/packages/shared ./packages/shared
 
-# Copy root node_modules (contains @eduplatform/shared -> ../../packages/shared symlink)
+# Copy root node_modules (contains prisma CLI + @prisma/client)
 COPY --from=builder /app/node_modules ./node_modules
-
-# Explicitly copy generated Prisma client (prisma generate outputs to node_modules/.prisma)
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Copy backend artifacts
 COPY --from=builder /app/apps/backend/dist ./dist
 COPY --from=builder /app/apps/backend/prisma ./prisma
 COPY --from=builder /app/apps/backend/package.json ./package.json
+
+# Generate Prisma client in runner so the engine binary matches this environment
+RUN npx prisma generate --schema ./prisma/schema.prisma
 
 RUN mkdir -p /app/storage
 
