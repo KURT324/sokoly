@@ -24,7 +24,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # --- Production runner ---
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
