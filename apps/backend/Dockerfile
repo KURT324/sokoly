@@ -14,6 +14,10 @@ RUN npm install
 COPY packages/shared ./packages/shared
 COPY apps/backend ./apps/backend
 
+# Build shared package first (backend requires @eduplatform/shared/dist at runtime)
+WORKDIR /app/packages/shared
+RUN npm run build
+
 # Generate Prisma client and build TypeScript
 WORKDIR /app/apps/backend
 RUN npx prisma generate
