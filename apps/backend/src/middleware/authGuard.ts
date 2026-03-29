@@ -1,11 +1,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { UserRole } from '@eduplatform/shared';
 import { prisma } from '../db';
 
 export interface JwtPayload {
   userId: string;
-  role: UserRole;
+  role: string;
 }
 
 declare module 'fastify' {
@@ -14,7 +13,7 @@ declare module 'fastify' {
       id: string;
       email: string;
       callsign: string;
-      role: UserRole;
+      role: string;
       cohort_id: string | null;
       must_change_password: boolean;
     };
@@ -57,13 +56,13 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     id: user.id,
     email: user.email,
     callsign: user.callsign,
-    role: user.role as unknown as UserRole,
+    role: user.role,
     cohort_id: user.cohort_id,
     must_change_password: user.must_change_password,
   };
 }
 
-export function roleGuard(...roles: UserRole[]) {
+export function roleGuard(...roles: string[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     await authGuard(request, reply);
     if (reply.sent) return;
