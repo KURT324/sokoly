@@ -35,6 +35,9 @@ COPY --from=builder /app/packages/shared ./packages/shared
 # Copy root node_modules (contains @eduplatform/shared -> ../../packages/shared symlink)
 COPY --from=builder /app/node_modules ./node_modules
 
+# Explicitly copy generated Prisma client (prisma generate outputs to node_modules/.prisma)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
 # Copy backend artifacts
 COPY --from=builder /app/apps/backend/dist ./dist
 COPY --from=builder /app/apps/backend/prisma ./prisma
