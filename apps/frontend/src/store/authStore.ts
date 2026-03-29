@@ -1,14 +1,7 @@
 import { create } from 'zustand';
-import { UserRole } from '@eduplatform/shared';
+import { User } from '@eduplatform/shared';
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  callsign: string;
-  role: UserRole;
-  cohort_id: string | null;
-  must_change_password: boolean;
-}
+export type AuthUser = User;
 
 interface AuthStore {
   user: AuthUser | null;

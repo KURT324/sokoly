@@ -25,7 +25,7 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
     const canvas = new fabric.Canvas(canvasElRef.current!, { width: 600, height: 400 });
     fabricRef.current = canvas;
 
-    fabric.Image.fromURL(backgroundUrl, (img) => {
+    fabric.Image.fromURL(backgroundUrl, (img: fabric.Image) => {
       img.set({ selectable: false, evented: false });
       canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
         scaleX: canvas.width! / (img.width || 600),

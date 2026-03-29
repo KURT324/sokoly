@@ -27,7 +27,7 @@ export function DrawingCanvas({ backgroundUrl, onChange }: Props) {
     fabricRef.current = canvas;
 
     if (backgroundUrl) {
-      fabric.Image.fromURL(backgroundUrl, (img) => {
+      fabric.Image.fromURL(backgroundUrl, (img: fabric.Image) => {
         img.set({ selectable: false, evented: false, lockMovementX: true, lockMovementY: true });
         canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
           scaleX: canvas.width! / (img.width || 600),
