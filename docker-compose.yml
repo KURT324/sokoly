@@ -1,0 +1,115 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eduplatform_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: edu
+      POSTGRES_PASSWORD: edu
+      POSTGRES_DB: eduplatform
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edu -d eduplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eduplatform
+
+  redis:
+    image: redis:7-alpine
+    container_name: eduplatform_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eduplatform
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile.dev
+    container_name: eduplatform_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://edu:edu@postgres:5432/eduplatform?client_encoding=UTF8
+      REDIS_URL: redis://redis:6379
+      PGCLIENTENCODING: UTF8
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./packages:/app/packages
+      - backend_node_modules:/app/node_modules
+      - backend_storage:/app/apps/backend/src/storage
+    entrypoint: ["/bin/sh", "/app/apps/backend/entrypoint.sh"]
+    ports:
+      - "3000:3000"
+    working_dir: /app/apps/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - eduplatform
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile.dev
+    container_name: eduplatform_frontend
+    restart: unless-stopped
+    volumes:
+      - ./apps/frontend:/app/apps/frontend
+      - ./packages:/app/packages
+      - frontend_node_modules:/app/apps/frontend/node_modules
+    ports:
+      - "5173:5173"
+    working_dir: /app/apps/frontend
+    depends_on:
+      - backend
+    networks:
+      - eduplatform
+
+  nginx:
+    image: nginx:alpine
+    container_name: eduplatform_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - eduplatform
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_storage:
+  backend_node_modules:
+  frontend_node_modules:
+  frontend_root_node_modules:
+
+networks:
+  eduplatform:
+    driver: bridge

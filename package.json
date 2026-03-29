@@ -1,0 +1,16 @@
+{
+  "name": "eduplatform",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "docker compose up -d && concurrently \"npm run dev --workspace=apps/backend\" \"npm run dev --workspace=apps/frontend\"",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/backend && npm run build --workspace=apps/frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -1,0 +1,241 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum DayStatus {
+  LOCKED
+  OPEN
+  ARCHIVED
+}
+
+enum MaterialType {
+  PDF
+  DOC
+  IMAGE
+  LINK
+}
+
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+  OPEN_TEXT
+  DRAWING
+}
+
+enum CardTaskStatus {
+  PENDING
+  AWAITING_REVIEW
+  RETURNED
+  COMPLETED
+}
+
+enum ChatType {
+  GROUP
+  STUDENT_TEACHER
+  STUDENT_ADMIN
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  password_hash        String
+  callsign            String
+  role                 UserRole
+  watermark_id         String?   @unique
+  cohort_id            String?
+  must_change_password Boolean   @default(true)
+  is_active            Boolean   @default(true)
+  created_at           DateTime  @default(now())
+  last_login_at        DateTime?
+
+  cohort           Cohort?          @relation(fields: [cohort_id], references: [id])
+  opened_days      Day[]            @relation("OpenedBy")
+  created_tests    Test[]           @relation("CreatedBy")
+  test_submissions TestSubmission[]
+  card_tasks       CardTask[]       @relation("AssignedTo")
+  created_tasks    CardTask[]       @relation("CreatedBy")
+  chat_messages    ChatMessage[]
+
+  @@map("users")
+}
+
+model Cohort {
+  id         String   @id @default(uuid())
+  name       String
+  started_at DateTime
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  users User[]
+  days  Day[]
+  tests Test[]
+  chats Chat[]
+
+  @@map("cohorts")
+}
+
+model Day {
+  id           String    @id @default(uuid())
+  day_number   Int
+  cohort_id    String
+  status       DayStatus @default(LOCKED)
+  opened_at    DateTime?
+  opened_by_id String?
+
+  cohort      Cohort     @relation(fields: [cohort_id], references: [id])
+  opened_by   User?      @relation("OpenedBy", fields: [opened_by_id], references: [id])
+  materials   Material[]
+  tests       Test[]
+  card_tasks  CardTask[]
+
+  @@map("days")
+}
+
+model Material {
+  id           String       @id @default(uuid())
+  day_id       String
+  type         MaterialType
+  title        String
+  storage_path String?
+  url          String?
+  size_bytes   BigInt?
+  created_at   DateTime     @default(now())
+
+  day Day @relation(fields: [day_id], references: [id])
+
+  @@map("materials")
+}
+
+model Test {
+  id                     String   @id @default(uuid())
+  title                  String
+  day_id                 String?
+  cohort_id              String
+  time_limit_min         Int?
+  show_result_immediately Boolean @default(true)
+  created_by_id          String
+  created_at             DateTime @default(now())
+
+  day         Day?             @relation(fields: [day_id], references: [id])
+  cohort      Cohort           @relation(fields: [cohort_id], references: [id])
+  created_by  User             @relation("CreatedBy", fields: [created_by_id], references: [id])
+  questions   TestQuestion[]
+  submissions TestSubmission[]
+
+  @@map("tests")
+}
+
+model TestQuestion {
+  id            String       @id @default(uuid())
+  test_id       String
+  type          QuestionType
+  question_text String
+  image_path    String?
+  order_index   Int
+
+  test    Test         @relation(fields: [test_id], references: [id], onDelete: Cascade)
+  answers TestAnswer[]
+
+  @@map("test_questions")
+}
+
+model TestAnswer {
+  id          String  @id @default(uuid())
+  question_id String
+  answer_text String
+  is_correct  Boolean
+
+  question TestQuestion @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@map("test_answers")
+}
+
+model TestSubmission {
+  id           String   @id @default(uuid())
+  test_id      String
+  student_id   String
+  answers_json Json
+  auto_score   Float?
+  manual_score Float?
+  submitted_at DateTime @default(now())
+
+  test    Test @relation(fields: [test_id], references: [id])
+  student User @relation(fields: [student_id], references: [id])
+
+  @@unique([test_id, student_id])
+  @@map("test_submissions")
+}
+
+model CardTask {
+  id             String         @id @default(uuid())
+  student_id     String
+  day_id         String
+  image_path     String
+  instructions   String
+  status         CardTaskStatus @default(PENDING)
+  created_by_id  String
+  created_at     DateTime       @default(now())
+
+  student    User          @relation("AssignedTo", fields: [student_id], references: [id])
+  day        Day           @relation(fields: [day_id], references: [id])
+  created_by User          @relation("CreatedBy", fields: [created_by_id], references: [id])
+  attempts   CardAttempt[]
+
+  @@map("card_tasks")
+}
+
+model CardAttempt {
+  id               String    @id @default(uuid())
+  task_id          String
+  attempt_number   Int
+  annotation_path  String
+  student_comment  String
+  teacher_comment  String?
+  is_correct       Boolean?
+  submitted_at     DateTime  @default(now())
+  reviewed_at      DateTime?
+
+  task CardTask @relation(fields: [task_id], references: [id])
+
+  @@map("card_attempts")
+}
+
+model Chat {
+  id         String   @id @default(uuid())
+  type       ChatType
+  cohort_id  String
+  name       String
+  created_at DateTime @default(now())
+
+  cohort   Cohort        @relation(fields: [cohort_id], references: [id])
+  messages ChatMessage[]
+
+  @@map("chats")
+}
+
+model ChatMessage {
+  id               String   @id @default(uuid())
+  chat_id          String
+  sender_id        String
+  content          String
+  attachments_json Json     @default("[]")
+  is_read          Boolean  @default(false)
+  created_at       DateTime @default(now())
+
+  chat   Chat @relation(fields: [chat_id], references: [id])
+  sender User @relation(fields: [sender_id], references: [id])
+
+  @@map("chat_messages")
+}

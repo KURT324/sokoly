@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+RUN apk add --no-cache wget openssl
+
+WORKDIR /app
+
+COPY apps/backend/package.json ./apps/backend/
+COPY packages/shared/package.json ./packages/shared/
+COPY package.json ./
+
+RUN npm install --workspace=apps/backend --workspace=packages/shared
+
+COPY apps/backend ./apps/backend
+COPY packages/shared ./packages/shared
+
+WORKDIR /app/apps/backend
+
+RUN npx prisma generate
+
+EXPOSE 3000
+
+# Entrypoint is loaded from mounted volume at runtime
