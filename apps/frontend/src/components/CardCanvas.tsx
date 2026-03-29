@@ -37,7 +37,7 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
     canvas.on('object:added', updateHas);
     canvas.on('object:removed', updateHas);
 
-    onExport(() => canvas.toDataURL('image/png'));
+    onExport(() => canvas.toDataURL({ format: 'png' }));
 
     return () => {
       canvas.dispose();

@@ -36,7 +36,7 @@ export function DrawingCanvas({ backgroundUrl, onChange }: Props) {
       }, { crossOrigin: 'anonymous' });
     }
 
-    const emitChange = () => onChange(canvas.toDataURL('image/png'));
+    const emitChange = () => onChange(canvas.toDataURL({ format: 'png' }));
     canvas.on('object:added', emitChange);
     canvas.on('object:modified', emitChange);
 
@@ -98,7 +98,7 @@ export function DrawingCanvas({ backgroundUrl, onChange }: Props) {
       if (!isDrawingShapeRef.current) return;
       isDrawingShapeRef.current = false;
       activeShapeRef.current = null;
-      onChange(canvas.toDataURL('image/png'));
+      onChange(canvas.toDataURL({ format: 'png' }));
     });
   }, [tool, color, brushSize]);
 
@@ -109,7 +109,7 @@ export function DrawingCanvas({ backgroundUrl, onChange }: Props) {
     if (objects.length > 0) {
       canvas.remove(objects[objects.length - 1]);
       canvas.renderAll();
-      onChange(canvas.toDataURL('image/png'));
+      onChange(canvas.toDataURL({ format: 'png' }));
     }
   };
 
