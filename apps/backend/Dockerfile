@@ -20,6 +20,7 @@ RUN npm run build
 
 # Generate Prisma client and build TypeScript
 WORKDIR /app/apps/backend
+RUN apt-get update -y && apt-get install -y openssl
 RUN npx prisma generate
 RUN npm run build
 
