@@ -109,7 +109,7 @@ chown -R "${DEPLOY_USER}:${DEPLOY_USER}" ${APP_DIR} /backups
 
 if [ -d "${APP_DIR}/.git" ]; then
   echo "    Репозиторий уже существует, выполняю git pull..."
-  sudo -u "$DEPLOY_USER" git -C ${APP_DIR} pull origin main
+  sudo -u "$DEPLOY_USER" git -C ${APP_DIR} pull origin master
 else
   sudo -u "$DEPLOY_USER" git clone "$REPO_URL" ${APP_DIR}
 fi
