@@ -111,6 +111,7 @@ if [ -d "${APP_DIR}/.git" ]; then
   echo "    Репозиторий уже существует, выполняю git pull..."
   sudo -u "$DEPLOY_USER" git -C ${APP_DIR} pull origin master
 else
+  rm -rf ${APP_DIR}
   sudo -u "$DEPLOY_USER" git clone "$REPO_URL" ${APP_DIR}
 fi
 chown -R "${DEPLOY_USER}:${DEPLOY_USER}" ${APP_DIR}
