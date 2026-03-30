@@ -115,26 +115,29 @@ else
 fi
 chown -R "${DEPLOY_USER}:${DEPLOY_USER}" ${APP_DIR}
 
-# Подставить домен в nginx конфиг
+# Подставить домен в nginx конфиг и env-шаблон
 sed -i "s/YOUR_DOMAIN/${DOMAIN}/g" ${APP_DIR}/nginx/nginx.prod.conf
 echo "    Домен $DOMAIN прописан в nginx/nginx.prod.conf"
+
+# Создать .env.production из шаблона с уже подставленным доменом
+cp ${APP_DIR}/.env.production.example ${APP_DIR}/.env.production
+sed -i "s/YOUR_DOMAIN/${DOMAIN}/g" ${APP_DIR}/.env.production
+echo "    Домен $DOMAIN подставлен в .env.production (FRONTEND_URL, COOKIE_DOMAIN)"
 
 # --- .env.production ---
 echo ""
 echo "==================================================================="
-echo "  ДЕЙСТВИЕ ТРЕБУЕТСЯ: заполни файл окружения перед запуском"
+echo "  ДЕЙСТВИЕ ТРЕБУЕТСЯ: заполни оставшиеся секреты в файле окружения"
 echo ""
-echo "  cp ${APP_DIR}/.env.production.example ${APP_DIR}/.env.production"
 echo "  nano ${APP_DIR}/.env.production"
+echo ""
+echo "  Обязательно замени:"
+echo "    POSTGRES_PASSWORD, REDIS_PASSWORD, JWT_SECRET"
+echo "  FRONTEND_URL и COOKIE_DOMAIN уже содержат домен: ${DOMAIN}"
 echo ""
 echo "  Нажми Enter после того как заполнишь .env.production..."
 echo "==================================================================="
 read -p ""
-
-if [ ! -f "${APP_DIR}/.env.production" ]; then
-  echo "ОШИБКА: файл ${APP_DIR}/.env.production не найден. Создай его и запусти скрипт заново."
-  exit 1
-fi
 
 # --- 8. SSL-сертификат ---
 echo ""
