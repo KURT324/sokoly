@@ -78,7 +78,7 @@ export function TeacherAnalyticsPage() {
               <table className="text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden w-full">
                 <thead className="bg-gray-50 dark:bg-slate-700/30 border-b border-gray-200 dark:border-slate-700">
                   <tr>
-                    <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-slate-400 w-40">Студент</th>
+                    <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-slate-400 w-40">Курсант</th>
                     {testData.tests.map((t) => (
                       <th key={t.id} className="text-center px-3 py-2 font-medium text-gray-600 dark:text-slate-400 max-w-28">
                         <span className="block truncate text-xs" title={t.title}>{t.title}</span>
@@ -141,7 +141,7 @@ export function TeacherAnalyticsPage() {
               <table className="text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden w-full">
                 <thead className="bg-gray-50 dark:bg-slate-700/30 border-b border-gray-200 dark:border-slate-700">
                   <tr>
-                    <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-slate-400">Студент</th>
+                    <th className="text-left px-4 py-2 font-medium text-gray-600 dark:text-slate-400">Курсант</th>
                     <th className="text-center px-3 py-2 font-medium text-gray-600 dark:text-slate-400">Заданий</th>
                     <th className="text-center px-3 py-2 font-medium text-gray-600 dark:text-slate-400">Попыток</th>
                     <th className="text-center px-3 py-2 font-medium text-gray-600 dark:text-slate-400">% с 1-й попытки</th>
@@ -179,7 +179,7 @@ export function TeacherAnalyticsPage() {
 
             {/* Bar chart */}
             <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-5">
-              <p className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-4">Среднее кол-во попыток на студента</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-4">Среднее кол-во попыток на курсанта</p>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={barChartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />

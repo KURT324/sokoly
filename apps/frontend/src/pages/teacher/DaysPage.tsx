@@ -44,7 +44,7 @@ export function TeacherDaysPage() {
   }, [selectedCohort, isAdmin]);
 
   const handleOpen = async (day: DayRecord) => {
-    if (!confirm(`Открыть День ${day.day_number}? Студенты сразу получат доступ к материалам.`)) return;
+    if (!confirm(`Открыть День ${day.day_number}? Курсанты сразу получат доступ к материалам.`)) return;
     await daysApi.openDay(day.id);
     setDays((prev) => prev.map((d) => d.id === day.id ? { ...d, status: DayStatus.OPEN } : d));
   };

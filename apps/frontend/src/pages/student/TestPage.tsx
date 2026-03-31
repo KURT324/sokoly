@@ -105,7 +105,7 @@ export function StudentTestPage() {
             <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center">
               <div className="text-4xl mb-3">📬</div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">Ответы отправлены</h2>
-              <p className="text-gray-500 dark:text-slate-400">Ждите проверки преподавателя</p>
+              <p className="text-gray-500 dark:text-slate-400">Ждите проверки инструктора</p>
             </div>
           )}
 

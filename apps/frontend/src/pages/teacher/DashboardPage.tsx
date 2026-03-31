@@ -19,7 +19,7 @@ export function TeacherDashboardPage() {
           <h1 className="text-2xl font-semibold text-[#111827] dark:text-slate-100">
             Добро пожаловать, {user?.callsign}
           </h1>
-          <p className="text-[#6b7280] dark:text-slate-400 text-sm mt-1">Панель преподавателя</p>
+          <p className="text-[#6b7280] dark:text-slate-400 text-sm mt-1">Панель инструктора</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

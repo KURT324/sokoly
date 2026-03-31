@@ -5,8 +5,8 @@ import { Layout } from '../../components/Layout';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.ADMIN]: 'Администратор',
-  [UserRole.TEACHER]: 'Преподаватель',
-  [UserRole.STUDENT]: 'Студент',
+  [UserRole.TEACHER]: 'Инструктор',
+  [UserRole.STUDENT]: 'Курсант',
 };
 
 export function AdminUsersPage() {

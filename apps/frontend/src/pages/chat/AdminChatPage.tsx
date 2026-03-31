@@ -30,7 +30,7 @@ export function AdminChatPage() {
     <Layout>
       <div className="max-w-5xl mx-auto h-[calc(100vh-120px)] flex flex-col">
         <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-3">
-          {isAdmin ? 'Чаты студентов с администратором' : 'Чат с администратором'}
+          {isAdmin ? 'Чаты курсантов с администратором' : 'Чат с администратором'}
         </h1>
 
         {isAdmin ? (
@@ -57,7 +57,7 @@ export function AdminChatPage() {
                 <ChatWindow key={selected.id} chat={selected} />
               ) : (
                 <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm">
-                  Выберите студента
+                  Выберите курсанта
                 </div>
               )}
             </div>

@@ -54,7 +54,7 @@ export function StudentDashboardPage() {
                 <EmptyState
                   icon={<IconCalendar />}
                   title="Дни ещё не открыты"
-                  desc="Преподаватель откроет учебные дни по расписанию"
+                  desc="Инструктор откроет учебные дни по расписанию"
                 />
               ) : (
                 <div className="p-6 grid grid-cols-4 sm:grid-cols-6 gap-2.5">
@@ -91,7 +91,7 @@ export function StudentDashboardPage() {
               <EmptyState
                 icon={<IconBook />}
                 title="Нет доступных материалов"
-                desc="Материалы появятся, когда преподаватель их откроет"
+                desc="Материалы появятся, когда инструктор их откроет"
               />
             )}
           </>

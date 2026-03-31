@@ -181,7 +181,7 @@ export function TeacherTestResultsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-slate-700/30 border-b border-gray-200 dark:border-slate-700">
                   <tr>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Студент</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Курсант</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Авто</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Итог</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Статус</th>
@@ -343,7 +343,7 @@ export function TeacherTestResultsPage() {
                             )}
                             {ans?.drawing_path && (
                               <div>
-                                <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Ответ студента:</p>
+                                <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Ответ курсанта:</p>
                                 <img src={testsApi.getDrawingUrl(ans.drawing_path)} alt="drawing" className="h-28 rounded border border-gray-200 dark:border-slate-700 object-contain" />
                               </div>
                             )}
@@ -373,7 +373,7 @@ export function TeacherTestResultsPage() {
             </div>
           ) : (
             <div className="w-[420px] shrink-0 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-sm text-gray-400 dark:text-slate-500 py-16">
-              Выберите студента слева
+              Выберите курсанта слева
             </div>
           )}
         </div>

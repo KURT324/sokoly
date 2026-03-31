@@ -38,13 +38,13 @@ export function AdminDashboardPage() {
             color="indigo"
           />
           <StatCard
-            label="Преподавателей"
+            label="Инструкторов"
             value={stats.teachers}
             icon={<IconUsers />}
             color="emerald"
           />
           <StatCard
-            label="Студентов"
+            label="Курсантов"
             value={stats.students}
             icon={<IconGraduation />}
             color="amber"
@@ -55,9 +55,9 @@ export function AdminDashboardPage() {
         <div>
           <p className="text-xs font-medium text-[#6b7280] dark:text-slate-500 uppercase tracking-wider mb-3">Быстрый доступ</p>
           <div className="grid grid-cols-2 gap-3">
-            <QuickLink to="/admin/users"    title="Пользователи"  desc="Учётные записи студентов и преподавателей" icon={<IconUsers />} />
+            <QuickLink to="/admin/users"    title="Пользователи"  desc="Учётные записи курсантов и инструкторов" icon={<IconUsers />} />
             <QuickLink to="/admin/cohorts"  title="Группы"        desc="Управление учебными группами"              icon={<IconLayers />} />
-            <QuickLink to="/admin/analytics" title="Аналитика"    desc="Успеваемость и активность студентов"       icon={<IconChart />} />
+            <QuickLink to="/admin/analytics" title="Аналитика"    desc="Успеваемость и активность курсантов"       icon={<IconChart />} />
             <QuickLink to="/teacher/days"   title="Учебные дни"   desc="Контент и материалы курса"                 icon={<IconCalendar />} />
           </div>
         </div>

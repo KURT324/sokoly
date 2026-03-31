@@ -73,8 +73,8 @@ export function AdminAnalyticsPage() {
         {data && (
           <div className="grid grid-cols-3 gap-4">
             <MetricCard label="Активных групп" value={data.metrics.totalActiveCohorts} color="blue" />
-            <MetricCard label="Студентов" value={data.metrics.totalStudents} color="green" />
-            <MetricCard label="Преподавателей" value={data.metrics.totalTeachers} color="purple" />
+            <MetricCard label="Курсантов" value={data.metrics.totalStudents} color="green" />
+            <MetricCard label="Инструкторов" value={data.metrics.totalTeachers} color="purple" />
           </div>
         )}
 
@@ -87,7 +87,7 @@ export function AdminAnalyticsPage() {
                 <thead className="bg-gray-50 dark:bg-slate-700/30 border-b border-gray-200 dark:border-slate-700">
                   <tr>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Группа</th>
-                    <th className="text-center px-3 py-3 font-medium text-gray-600 dark:text-slate-400">Студентов</th>
+                    <th className="text-center px-3 py-3 font-medium text-gray-600 dark:text-slate-400">Курсантов</th>
                     <th className="text-center px-3 py-3 font-medium text-gray-600 dark:text-slate-400">Средний балл (тесты)</th>
                     <th className="text-center px-3 py-3 font-medium text-gray-600 dark:text-slate-400">% карточек с 1-й попытки</th>
                     <th className="text-center px-3 py-3 font-medium text-gray-600 dark:text-slate-400">Дата начала</th>
@@ -168,12 +168,12 @@ function MetricCard({ label, value, color }: { label: string; value: number; col
 }
 
 function StudentDetailTable({ rows }: { rows: Array<{ student: { id: string; callsign: string }; average: number | null; cardStats: any }> }) {
-  if (!rows || rows.length === 0) return <p className="text-gray-400 dark:text-slate-500 text-sm">Нет студентов</p>;
+  if (!rows || rows.length === 0) return <p className="text-gray-400 dark:text-slate-500 text-sm">Нет курсантов</p>;
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="text-gray-500 dark:text-slate-400 text-xs">
-          <th className="text-left py-1 pr-4">Студент</th>
+          <th className="text-left py-1 pr-4">Курсант</th>
           <th className="text-center py-1 pr-4">Средний балл</th>
           <th className="text-center py-1 pr-4">Попыток карточек</th>
           <th className="text-center py-1">% с 1-й попытки</th>

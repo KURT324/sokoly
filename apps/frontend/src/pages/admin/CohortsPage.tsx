@@ -17,7 +17,7 @@ export function AdminCohortsPage() {
   useEffect(() => { fetchCohorts(); }, []);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Удалить группу "${name}"? Все студенты этой группы будут удалены.`)) return;
+    if (!confirm(`Удалить группу "${name}"? Все курсанты этой группы будут удалены.`)) return;
     await adminApi.deleteCohort(id);
     fetchCohorts();
   };
@@ -44,7 +44,7 @@ export function AdminCohortsPage() {
                 <tr>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-slate-400">Название</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-slate-400">Дата начала</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-slate-400">Студентов</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-slate-400">Курсантов</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-slate-400">Статус</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-slate-400">Действия</th>
                 </tr>

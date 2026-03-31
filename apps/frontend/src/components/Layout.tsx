@@ -194,24 +194,24 @@ const MAIN_NAV: Record<UserRole, NavItem[]> = {
 const CHAT_NAV: Record<UserRole, NavItem[]> = {
   [UserRole.ADMIN]: [
     { label: 'Общий чат', to: '/chat/group',   icon: <IconHash />, chatType: 'GROUP' },
-    { label: 'Студенты',  to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
+    { label: 'Курсанты',  to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
     { label: 'Личные',    to: '/chat/admin',   icon: <IconHash />, chatType: 'STUDENT_ADMIN' },
   ],
   [UserRole.TEACHER]: [
     { label: 'Общий чат', to: '/chat/group',   icon: <IconHash />, chatType: 'GROUP' },
-    { label: 'Студенты',  to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
+    { label: 'Курсанты',  to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
   ],
   [UserRole.STUDENT]: [
     { label: 'Общий чат',     to: '/chat/group',   icon: <IconHash />, chatType: 'GROUP' },
-    { label: 'Преподаватель', to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
+    { label: 'Инструктор', to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
     { label: 'Администратор', to: '/chat/admin',   icon: <IconHash />, chatType: 'STUDENT_ADMIN' },
   ],
 };
 
 const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.ADMIN]:   'Администратор',
-  [UserRole.TEACHER]: 'Преподаватель',
-  [UserRole.STUDENT]: 'Студент',
+  [UserRole.TEACHER]: 'Инструктор',
+  [UserRole.STUDENT]: 'Курсант',
 };
 
 function getInitials(name: string): string {

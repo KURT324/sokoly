@@ -50,7 +50,7 @@ export function StudentCardsPage() {
         {task === null && (
           <div className="bg-gray-50 dark:bg-slate-700/30 border border-gray-200 dark:border-slate-700 rounded-xl p-12 text-center">
             <div className="text-4xl mb-3">📭</div>
-            <p className="text-gray-500 dark:text-slate-400">Заданий пока нет. Преподаватель скоро отправит карточку.</p>
+            <p className="text-gray-500 dark:text-slate-400">Заданий пока нет. Инструктор скоро отправит карточку.</p>
           </div>
         )}
 
@@ -65,7 +65,7 @@ export function StudentCardsPage() {
         {task && task.status === 'AWAITING_REVIEW' && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-8 text-center">
             <div className="text-3xl mb-2">⏳</div>
-            <h2 className="text-lg font-semibold text-amber-800 mb-1">Ожидает проверки преподавателя</h2>
+            <h2 className="text-lg font-semibold text-amber-800 mb-1">Ожидает проверки инструктора</h2>
             <p className="text-amber-600 dark:text-amber-400 text-sm">Попытка #{task.attempts.length} отправлена</p>
             {task.attempts[task.attempts.length - 1] && (
               <div className="mt-4">

@@ -79,7 +79,7 @@ export function TeacherCardsPage() {
   const handleAssign = async () => {
     setAssignError('');
     setAssignSuccess('');
-    if (!assignStudentId) return setAssignError('Выберите студента');
+    if (!assignStudentId) return setAssignError('Выберите курсанта');
     if (!assignDayId) return setAssignError('Выберите день');
     if (!assignImage) return setAssignError('Загрузите изображение');
     if (!assignInstructions.trim()) return setAssignError('Введите инструкцию');
@@ -92,7 +92,7 @@ export function TeacherCardsPage() {
       form.append('instructions', assignInstructions);
       form.append('image', assignImage);
       await cardTasksApi.createTask(form);
-      setAssignSuccess('Карточка отправлена студенту!');
+      setAssignSuccess('Карточка отправлена курсанту!');
       setAssignStudentId('');
       setAssignDayId('');
       setAssignInstructions('');
@@ -194,7 +194,7 @@ export function TeacherCardsPage() {
                           />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Аннотация студента (попытка #{latest.attempt_number}):</p>
+                          <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Аннотация курсанта (попытка #{latest.attempt_number}):</p>
                           <img
                             src={cardTasksApi.getAnnotationUrl(latest.annotation_path)}
                             alt="annotation"
@@ -203,7 +203,7 @@ export function TeacherCardsPage() {
                         </div>
                       </div>
                       <p className="text-sm bg-gray-50 dark:bg-slate-700/30 rounded-lg px-3 py-2">
-                        <span className="font-medium text-gray-700 dark:text-slate-200">Комментарий студента:</span>{' '}
+                        <span className="font-medium text-gray-700 dark:text-slate-200">Комментарий курсанта:</span>{' '}
                         <span className="text-gray-600 dark:text-slate-400">{latest.student_comment}</span>
                       </p>
                     </div>
@@ -247,7 +247,7 @@ export function TeacherCardsPage() {
                   {showCommentFor === 'incorrect' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
-                        Комментарий для студента <span className="text-red-500">*</span>
+                        Комментарий для курсанта <span className="text-red-500">*</span>
                       </label>
                       <textarea
                         value={teacherComment}
@@ -294,13 +294,13 @@ export function TeacherCardsPage() {
         {tab === 'assign' && (
           <div className="max-w-lg space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Студент *</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Курсант *</label>
               <select
                 value={assignStudentId}
                 onChange={(e) => { setAssignStudentId(e.target.value); setAssignDayId(''); }}
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Выберите студента</option>
+                <option value="">Выберите курсанта</option>
                 {students.map((s) => (
                   <option key={s.id} value={s.id}>{s.callsign}</option>
                 ))}
@@ -344,7 +344,7 @@ export function TeacherCardsPage() {
               <textarea
                 value={assignInstructions}
                 onChange={(e) => setAssignInstructions(e.target.value)}
-                placeholder="Что должен сделать студент..."
+                placeholder="Что должен сделать курсант..."
                 rows={3}
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
@@ -362,7 +362,7 @@ export function TeacherCardsPage() {
               disabled={assignSubmitting}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
-              {assignSubmitting ? 'Отправка...' : 'Отправить студенту'}
+              {assignSubmitting ? 'Отправка...' : 'Отправить курсанту'}
             </button>
           </div>
         )}
