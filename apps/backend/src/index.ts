@@ -17,6 +17,9 @@ import { analyticsRoutes } from './routes/analytics';
 import { chatsRoutes } from './routes/chats';
 import { setupSocket } from './socket';
 
+// BigInt is not JSON-serializable by default; Prisma returns BigInt for some aggregate fields
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
+
 const app = Fastify({ logger: true, bodyLimit: 55 * 1024 * 1024 });
 
 // Support multiple comma-separated origins: FRONTEND_URL=https://sokolbla.ru,https://www.sokolbla.ru
