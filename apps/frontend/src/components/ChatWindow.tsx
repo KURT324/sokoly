@@ -105,8 +105,9 @@ export function ChatWindow({ chat }: Props) {
   });
 
   const handleSend = async (content: string, files: File[]) => {
-    await chatsApi.sendMessage(chat.id, content, files.length > 0 ? files : undefined);
-    // Message will arrive via socket
+    const res = await chatsApi.sendMessage(chat.id, content, files.length > 0 ? files : undefined);
+    const saved = res.data;
+    setMessages((prev) => prev.find((m) => m.id === saved.id) ? prev : [...prev, saved]);
   };
 
   const items = virtualizer.getVirtualItems();

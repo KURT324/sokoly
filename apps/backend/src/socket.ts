@@ -28,9 +28,9 @@ export function setupSocket(io: SocketIOServer) {
       const match = cookie.match(/token=([^;]+)/);
       if (!match) return next(new Error('Unauthorized'));
 
-      const payload = jwt.verify(match[1], process.env.JWT_SECRET || 'secret') as { sub: string };
+      const payload = jwt.verify(match[1], process.env.JWT_SECRET || 'secret') as { userId: string; role: string };
       const user = await prisma.user.findUnique({
-        where: { id: payload.sub },
+        where: { id: payload.userId },
         select: { id: true, callsign: true, role: true, cohort_id: true, is_active: true },
       });
       if (!user || !user.is_active) return next(new Error('Unauthorized'));
