@@ -54,7 +54,7 @@ model User {
   password_hash        String
   callsign            String
   role                 UserRole
-  watermark_id         String?   @unique
+  watermark_id         String?
   cohort_id            String?
   must_change_password Boolean   @default(true)
   is_active            Boolean   @default(true)
