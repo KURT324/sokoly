@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Layout } from '../../components/Layout';
-import { testsApi } from '../../api/tests';
+import { testsApi, CohortStudent } from '../../api/tests';
 import { cohortsApi, Cohort } from '../../api/cohorts';
 
 type QuestionType = 'SINGLE' | 'MULTIPLE' | 'OPEN_TEXT' | 'DRAWING';
@@ -37,6 +37,13 @@ interface QuestionForm {
   image_preview?: string;
   image_uploading?: boolean;
   answers: AnswerForm[];
+}
+
+interface VariantForm {
+  localId: string;
+  name: string;
+  questions: QuestionForm[];
+  student_ids: string[];
 }
 
 function makeId() {
@@ -58,7 +65,20 @@ function defaultQuestion(type: QuestionType): QuestionForm {
   };
 }
 
-// Sortable question wrapper
+function defaultVariant(index: number): VariantForm {
+  return { localId: makeId(), name: `Вариант ${index + 1}`, questions: [], student_ids: [] };
+}
+
+function typeLabel(t: QuestionType) {
+  const labels: Record<QuestionType, string> = {
+    SINGLE: 'Один ответ',
+    MULTIPLE: 'Несколько ответов',
+    OPEN_TEXT: 'Открытый ответ',
+    DRAWING: 'Рисование',
+  };
+  return labels[t];
+}
+
 function SortableQuestion({
   question,
   index,
@@ -83,7 +103,6 @@ function SortableQuestion({
   return (
     <div ref={setNodeRef} style={style} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4">
       <div className="flex items-start gap-3">
-        {/* Drag handle */}
         <button
           {...attributes}
           {...listeners}
@@ -92,7 +111,6 @@ function SortableQuestion({
         >
           ⠿
         </button>
-
         <div className="flex-1 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
@@ -102,22 +120,11 @@ function SortableQuestion({
               Удалить
             </button>
           </div>
-
           <QuestionEditor question={question} onUpdate={onUpdate} />
         </div>
       </div>
     </div>
   );
-}
-
-function typeLabel(t: QuestionType) {
-  const labels: Record<QuestionType, string> = {
-    SINGLE: 'Один ответ',
-    MULTIPLE: 'Несколько ответов',
-    OPEN_TEXT: 'Открытый ответ',
-    DRAWING: 'Рисование',
-  };
-  return labels[t];
 }
 
 function QuestionEditor({ question, onUpdate }: { question: QuestionForm; onUpdate: (q: QuestionForm) => void }) {
@@ -162,12 +169,7 @@ function QuestionEditor({ question, onUpdate }: { question: QuestionForm; onUpda
                   name={`correct-${question.localId}`}
                   checked={ans.is_correct}
                   onChange={() =>
-                    set({
-                      answers: question.answers.map((a) => ({
-                        ...a,
-                        is_correct: a.localId === ans.localId,
-                      })),
-                    })
+                    set({ answers: question.answers.map((a) => ({ ...a, is_correct: a.localId === ans.localId })) })
                   }
                   className="accent-blue-600"
                 />
@@ -212,7 +214,7 @@ function QuestionEditor({ question, onUpdate }: { question: QuestionForm; onUpda
             <input
               type="file"
               accept="image/*"
-              className="mt-1 block text-sm text-gray-500 dark:text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:bg-blue-900/20 file:text-blue-700 hover:file:bg-blue-100"
+              className="mt-1 block text-sm text-gray-500 dark:text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
             />
           </label>
@@ -240,7 +242,9 @@ export function TestCreatePage() {
   const [dayId, setDayId] = useState('');
   const [timeLimitMin, setTimeLimitMin] = useState('');
   const [showResultImmediately, setShowResultImmediately] = useState(true);
-  const [questions, setQuestions] = useState<QuestionForm[]>([]);
+  const [variants, setVariants] = useState<VariantForm[]>([defaultVariant(0)]);
+  const [activeVariantIdx, setActiveVariantIdx] = useState(0);
+  const [cohortStudents, setCohortStudents] = useState<CohortStudent[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -256,43 +260,105 @@ export function TestCreatePage() {
     });
   }, []);
 
-  const selectedCohort = cohorts.find((c) => c.id === cohortId);
+  useEffect(() => {
+    if (!cohortId) { setCohortStudents([]); return; }
+    testsApi.getCohortStudents(cohortId).then((r) => setCohortStudents(r.data));
+  }, [cohortId]);
 
-  const addQuestion = (type: QuestionType) => {
-    setQuestions((prev) => [...prev, defaultQuestion(type)]);
+  const selectedCohort = cohorts.find((c) => c.id === cohortId);
+  const activeVariant = variants[activeVariantIdx] ?? variants[0];
+
+  const updateVariant = (localId: string, patch: Partial<VariantForm>) =>
+    setVariants((prev) => prev.map((v) => (v.localId === localId ? { ...v, ...patch } : v)));
+
+  const addVariant = () => {
+    const newVariant = defaultVariant(variants.length);
+    setVariants((prev) => [...prev, newVariant]);
+    setActiveVariantIdx(variants.length);
   };
 
-  const updateQuestion = (localId: string, updated: QuestionForm) =>
-    setQuestions((prev) => prev.map((q) => (q.localId === localId ? updated : q)));
+  const removeVariant = (localId: string) => {
+    if (variants.length === 1) return;
+    const idx = variants.findIndex((v) => v.localId === localId);
+    setVariants((prev) => prev.filter((v) => v.localId !== localId));
+    setActiveVariantIdx((prev) => Math.min(prev, variants.length - 2));
+    // Free up students from removed variant — no action needed, they just won't be assigned
+    void idx;
+  };
 
-  const removeQuestion = (localId: string) =>
-    setQuestions((prev) => prev.filter((q) => q.localId !== localId));
+  const addQuestion = (type: QuestionType) => {
+    updateVariant(activeVariant.localId, {
+      questions: [...activeVariant.questions, defaultQuestion(type)],
+    });
+  };
+
+  const updateQuestion = (qLocalId: string, updated: QuestionForm) =>
+    updateVariant(activeVariant.localId, {
+      questions: activeVariant.questions.map((q) => (q.localId === qLocalId ? updated : q)),
+    });
+
+  const removeQuestion = (qLocalId: string) =>
+    updateVariant(activeVariant.localId, {
+      questions: activeVariant.questions.filter((q) => q.localId !== qLocalId),
+    });
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setQuestions((prev) => {
-        const oldIndex = prev.findIndex((q) => q.localId === active.id);
-        const newIndex = prev.findIndex((q) => q.localId === over.id);
-        return arrayMove(prev, oldIndex, newIndex);
+      const oldIndex = activeVariant.questions.findIndex((q) => q.localId === active.id);
+      const newIndex = activeVariant.questions.findIndex((q) => q.localId === over.id);
+      updateVariant(activeVariant.localId, {
+        questions: arrayMove(activeVariant.questions, oldIndex, newIndex),
       });
     }
+  };
+
+  // Toggle student assignment: if student is in another variant, move them; if in this, remove; if unassigned, add
+  const toggleStudent = (studentId: string) => {
+    const currentVariantLocalId = activeVariant.localId;
+    const inThisVariant = activeVariant.student_ids.includes(studentId);
+
+    setVariants((prev) =>
+      prev.map((v) => {
+        if (v.localId === currentVariantLocalId) {
+          return {
+            ...v,
+            student_ids: inThisVariant
+              ? v.student_ids.filter((id) => id !== studentId)
+              : [...v.student_ids, studentId],
+          };
+        }
+        // Remove from other variants (one variant per student per test)
+        return { ...v, student_ids: v.student_ids.filter((id) => id !== studentId) };
+      }),
+    );
+  };
+
+  const getStudentVariant = (studentId: string): string | null => {
+    for (const v of variants) {
+      if (v.student_ids.includes(studentId)) return v.localId;
+    }
+    return null;
   };
 
   const handleSave = async () => {
     setError('');
     if (!title.trim()) return setError('Введите название теста');
     if (!cohortId) return setError('Выберите группу');
-    if (questions.length === 0) return setError('Добавьте хотя бы один вопрос');
+    if (variants.length === 0) return setError('Добавьте хотя бы один вариант');
 
-    for (const q of questions) {
-      if (!q.question_text.trim()) return setError('Заполните текст всех вопросов');
-      if ((q.type === 'SINGLE' || q.type === 'MULTIPLE') && q.answers.some((a) => !a.answer_text.trim()))
-        return setError('Заполните все варианты ответов');
-      if ((q.type === 'SINGLE' || q.type === 'MULTIPLE') && !q.answers.some((a) => a.is_correct))
-        return setError(`Отметьте правильный ответ для вопроса: "${q.question_text.slice(0, 30)}..."`);
-      if (q.type === 'DRAWING' && !q.image_path)
-        return setError('Загрузите изображение для вопроса с рисованием');
+    for (const v of variants) {
+      if (!v.name.trim()) return setError('Введите название для каждого варианта');
+      if (v.questions.length === 0) return setError(`Добавьте вопросы в вариант "${v.name}"`);
+      for (const q of v.questions) {
+        if (!q.question_text.trim()) return setError('Заполните текст всех вопросов');
+        if ((q.type === 'SINGLE' || q.type === 'MULTIPLE') && q.answers.some((a) => !a.answer_text.trim()))
+          return setError('Заполните все варианты ответов');
+        if ((q.type === 'SINGLE' || q.type === 'MULTIPLE') && !q.answers.some((a) => a.is_correct))
+          return setError(`Отметьте правильный ответ для вопроса: "${q.question_text.slice(0, 30)}..."`);
+        if (q.type === 'DRAWING' && !q.image_path)
+          return setError('Загрузите изображение для вопроса с рисованием');
+      }
     }
 
     setSaving(true);
@@ -303,14 +369,18 @@ export function TestCreatePage() {
         day_id: dayId || undefined,
         time_limit_min: timeLimitMin ? Number(timeLimitMin) : undefined,
         show_result_immediately: showResultImmediately,
-        questions: questions.map((q, i) => ({
-          type: q.type,
-          question_text: q.question_text,
-          image_path: q.image_path,
-          order_index: i,
-          answers: q.type === 'SINGLE' || q.type === 'MULTIPLE'
-            ? q.answers.map((a) => ({ answer_text: a.answer_text, is_correct: a.is_correct }))
-            : undefined,
+        variants: variants.map((v) => ({
+          name: v.name,
+          student_ids: v.student_ids,
+          questions: v.questions.map((q, i) => ({
+            type: q.type,
+            question_text: q.question_text,
+            image_path: q.image_path,
+            order_index: i,
+            answers: q.type === 'SINGLE' || q.type === 'MULTIPLE'
+              ? q.answers.map((a) => ({ answer_text: a.answer_text, is_correct: a.is_correct }))
+              : undefined,
+          })),
         })),
       });
       navigate('/teacher/tests');
@@ -405,37 +475,135 @@ export function TestCreatePage() {
           </div>
         </div>
 
-        {/* Questions */}
-        <div className="space-y-3">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={questions.map((q) => q.localId)} strategy={verticalListSortingStrategy}>
-              {questions.map((q, i) => (
-                <SortableQuestion
-                  key={q.localId}
-                  question={q}
-                  index={i}
-                  onUpdate={(updated) => updateQuestion(q.localId, updated)}
-                  onRemove={() => removeQuestion(q.localId)}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
-
-        {/* Add question */}
-        <div className="bg-gray-50 dark:bg-slate-700/30 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl p-4">
-          <p className="text-sm text-gray-500 dark:text-slate-400 mb-3 font-medium">Добавить вопрос:</p>
-          <div className="flex flex-wrap gap-2">
-            {(['SINGLE', 'MULTIPLE', 'OPEN_TEXT', 'DRAWING'] as QuestionType[]).map((t) => (
+        {/* Variant tabs */}
+        <div>
+          <div className="flex items-center gap-1 mb-4 flex-wrap">
+            {variants.map((v, idx) => (
               <button
-                key={t}
-                onClick={() => addQuestion(t)}
-                className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:bg-blue-900/20 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                key={v.localId}
+                onClick={() => setActiveVariantIdx(idx)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  idx === activeVariantIdx
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-600 hover:border-blue-400'
+                }`}
               >
-                {typeLabel(t)}
+                {v.name}
+                {v.questions.length > 0 && (
+                  <span className={`ml-1.5 text-xs rounded-full px-1.5 ${idx === activeVariantIdx ? 'bg-white/20' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}>
+                    {v.questions.length}
+                  </span>
+                )}
               </button>
             ))}
+            <button
+              onClick={addVariant}
+              className="px-3 py-2 rounded-lg text-sm border border-dashed border-gray-300 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-600 transition-colors"
+            >
+              + Вариант
+            </button>
           </div>
+
+          {/* Active variant editor */}
+          {activeVariant && (
+            <div className="space-y-4">
+              {/* Variant name */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={activeVariant.name}
+                  onChange={(e) => updateVariant(activeVariant.localId, { name: e.target.value })}
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Название варианта"
+                />
+                {variants.length > 1 && (
+                  <button
+                    onClick={() => removeVariant(activeVariant.localId)}
+                    className="text-sm text-red-400 hover:text-red-600 whitespace-nowrap"
+                  >
+                    Удалить вариант
+                  </button>
+                )}
+              </div>
+
+              {/* Questions */}
+              <div className="space-y-3">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={activeVariant.questions.map((q) => q.localId)} strategy={verticalListSortingStrategy}>
+                    {activeVariant.questions.map((q, i) => (
+                      <SortableQuestion
+                        key={q.localId}
+                        question={q}
+                        index={i}
+                        onUpdate={(updated) => updateQuestion(q.localId, updated)}
+                        onRemove={() => removeQuestion(q.localId)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              </div>
+
+              {/* Add question */}
+              <div className="bg-gray-50 dark:bg-slate-700/30 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl p-4">
+                <p className="text-sm text-gray-500 dark:text-slate-400 mb-3 font-medium">Добавить вопрос:</p>
+                <div className="flex flex-wrap gap-2">
+                  {(['SINGLE', 'MULTIPLE', 'OPEN_TEXT', 'DRAWING'] as QuestionType[]).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => addQuestion(t)}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                    >
+                      {typeLabel(t)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Student assignment */}
+              {cohortStudents.length > 0 && (
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-3">
+                    Назначить курсантов на этот вариант
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                    {cohortStudents.map((s) => {
+                      const assignedVariantLocalId = getStudentVariant(s.id);
+                      const inThis = assignedVariantLocalId === activeVariant.localId;
+                      const inOther = assignedVariantLocalId !== null && !inThis;
+                      const otherVariant = inOther ? variants.find((v) => v.localId === assignedVariantLocalId) : null;
+                      return (
+                        <label key={s.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
+                          inThis
+                            ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-transparent hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={inThis}
+                            onChange={() => toggleStudent(s.id)}
+                            className="accent-blue-600"
+                          />
+                          <span className="text-sm text-gray-800 dark:text-slate-100 flex-1 min-w-0 truncate">{s.callsign}</span>
+                          {inOther && (
+                            <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">{otherVariant?.name}</span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
+                    {activeVariant.student_ids.length} из {cohortStudents.length} назначено
+                  </p>
+                </div>
+              )}
+
+              {!cohortId && (
+                <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-2">
+                  Выберите группу выше, чтобы назначить курсантов на вариант
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {error && (

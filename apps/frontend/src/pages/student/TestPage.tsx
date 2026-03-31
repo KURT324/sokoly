@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
-import { testsApi, Test, TestQuestion, SubmitResult } from '../../api/tests';
+import { testsApi, StudentTestDetail, TestQuestion, SubmitResult } from '../../api/tests';
 import { DrawingCanvas } from '../../components/DrawingCanvas';
 
 interface Answers {
@@ -15,7 +15,7 @@ interface Answers {
 export function StudentTestPage() {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
-  const [test, setTest] = useState<Test | null>(null);
+  const [test, setTest] = useState<StudentTestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
@@ -26,9 +26,9 @@ export function StudentTestPage() {
 
   useEffect(() => {
     if (!testId) return;
-    testsApi.getTest(testId).then((r) => {
+    testsApi.getStudentTest(testId).then((r) => {
       setTest(r.data);
-      if (r.data.time_limit_min) {
+      if (r.data.assigned && r.data.time_limit_min) {
         setTimeLeft(r.data.time_limit_min * 60);
       }
     }).finally(() => setLoading(false));
@@ -46,17 +46,17 @@ export function StudentTestPage() {
   }, [timeLeft, result]);
 
   const handleSubmit = async () => {
-    if (!test || !testId || submitting) return;
+    if (!test || !testId || !test.assigned || !test.variant || submitting) return;
     if (timerRef.current) clearInterval(timerRef.current);
     setSubmitting(true);
 
-    const payload = test.questions.map((q) => {
+    const payload = (test.variant.questions ?? []).map((q) => {
       const ans = answers[q.id] ?? {};
       return { question_id: q.id, ...ans };
     });
 
     try {
-      const r = await testsApi.submitTest(testId, payload);
+      const r = await testsApi.submitTest(testId, payload, test.variant.id);
       setResult(r.data);
     } finally {
       setSubmitting(false);
@@ -68,6 +68,27 @@ export function StudentTestPage() {
 
   if (loading) return <Layout><div className="text-center text-gray-400 dark:text-slate-500 py-12">Загрузка...</div></Layout>;
   if (!test) return <Layout><div className="text-center text-gray-400 dark:text-slate-500 py-12">Тест не найден</div></Layout>;
+
+  // Not assigned to any variant
+  if (!test.assigned) {
+    return (
+      <Layout>
+        <div className="max-w-xl mx-auto pt-12 text-center space-y-4">
+          <div className="text-5xl">📋</div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">{test.title}</h1>
+          <p className="text-gray-500 dark:text-slate-400">
+            Вам не назначен вариант для этого теста. Обратитесь к инструктору.
+          </p>
+          <button
+            onClick={() => navigate('/student/dashboard')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+          >
+            На главную
+          </button>
+        </div>
+      </Layout>
+    );
+  }
 
   // Result screen
   if (result) {
@@ -94,7 +115,7 @@ export function StudentTestPage() {
                     </div>
                   );
                 })}
-                {(result.questions?.some((q) => q.type === 'OPEN_TEXT' || q.type === 'DRAWING')) && (
+                {result.questions?.some((q) => q.type === 'OPEN_TEXT' || q.type === 'DRAWING') && (
                   <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-3 py-2">
                     Некоторые вопросы ждут проверки преподавателем
                   </p>
@@ -120,8 +141,9 @@ export function StudentTestPage() {
     );
   }
 
-  const question = test.questions[currentIdx];
-  const totalQ = test.questions.length;
+  const questions = test.variant!.questions ?? [];
+  const question = questions[currentIdx];
+  const totalQ = questions.length;
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -132,9 +154,11 @@ export function StudentTestPage() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto space-y-5">
-        {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">{test.title}</h1>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100">{test.title}</h1>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{test.variant!.name}</p>
+          </div>
           {timeLeft !== null && (
             <div className={`font-mono text-lg font-semibold px-3 py-1 rounded-lg ${timeLeft < 60 ? 'bg-red-100 text-red-600 dark:text-red-400' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200'}`}>
               ⏱ {formatTime(timeLeft)}
@@ -144,7 +168,7 @@ export function StudentTestPage() {
 
         {/* Progress dots */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {test.questions.map((q, i) => (
+          {questions.map((q, i) => (
             <button
               key={q.id}
               onClick={() => setCurrentIdx(i)}
@@ -163,14 +187,12 @@ export function StudentTestPage() {
 
         <p className="text-sm text-gray-500 dark:text-slate-400">Вопрос {currentIdx + 1} из {totalQ}</p>
 
-        {/* Question */}
         <QuestionRenderer
           question={question}
           answer={answers[question.id] ?? {}}
           onAnswer={(patch) => setAnswerField(question.id, patch)}
         />
 
-        {/* Navigation */}
         <div className="flex items-center justify-between pt-2">
           <button
             onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}

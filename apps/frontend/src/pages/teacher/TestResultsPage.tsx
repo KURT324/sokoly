@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
-import { testsApi, Test, TestSubmission } from '../../api/tests';
+import { testsApi, Test, TestSubmission, TestQuestion } from '../../api/tests';
 
 type StatusFilter = 'all' | 'checked' | 'pending';
 
@@ -15,17 +15,16 @@ function finalScore(sub: TestSubmission) {
   return '—';
 }
 
-function isQuestionCorrect(ans: any, question: any): boolean {
+function isQuestionCorrect(ans: any, question: TestQuestion): boolean {
   if (!question) return true;
   if (question.type === 'SINGLE' || question.type === 'MULTIPLE') {
     const chosen: string[] = ans.answer_ids ?? [];
-    const correct = question.answers.filter((a: any) => a.is_correct).map((a: any) => a.id);
+    const correct = question.answers.filter((a) => a.is_correct).map((a) => a.id);
     return (
       chosen.length === correct.length &&
       correct.every((id: string) => chosen.includes(id))
     );
   }
-  // OPEN_TEXT and DRAWING are always shown (manual grading)
   return false;
 }
 
@@ -39,11 +38,8 @@ export function TeacherTestResultsPage() {
   const [savingScore, setSavingScore] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-
-  // Detail panel: show only wrong answers by default
   const [showAllQuestions, setShowAllQuestions] = useState(false);
 
   useEffect(() => {
@@ -56,7 +52,6 @@ export function TeacherTestResultsPage() {
       .finally(() => setLoading(false));
   }, [testId]);
 
-  // Reset showAll when switching students
   useEffect(() => { setShowAllQuestions(false); }, [selected?.id]);
 
   const handleSaveScore = async (subId: string) => {
@@ -84,33 +79,39 @@ export function TeacherTestResultsPage() {
     });
   }, [submissions, search, statusFilter]);
 
-  // Correct/total counter for selected submission
+  // Get questions for selected submission's variant
+  const variantQuestions = useMemo((): TestQuestion[] => {
+    if (!selected || !test) return [];
+    const variant = selected.variant_id
+      ? test.variants?.find((v) => v.id === selected.variant_id)
+      : test.variants?.[0];
+    return variant?.questions ?? [];
+  }, [selected, test]);
+
   const scoreStats = useMemo(() => {
-    if (!selected || !test) return null;
+    if (!selected || variantQuestions.length === 0) return null;
     const answers: any[] = Array.isArray(selected.answers_json) ? selected.answers_json : [];
-    const autoGradable = test.questions.filter((q) => q.type === 'SINGLE' || q.type === 'MULTIPLE');
+    const autoGradable = variantQuestions.filter((q) => q.type === 'SINGLE' || q.type === 'MULTIPLE');
     if (autoGradable.length === 0) return null;
     const correct = autoGradable.filter((q) => {
-      const ans = answers.find((a) => a.question_id === q.id);
+      const ans = answers.find((a: any) => a.question_id === q.id);
       return ans && isQuestionCorrect(ans, q);
     }).length;
     return { correct, total: autoGradable.length };
-  }, [selected, test]);
+  }, [selected, variantQuestions]);
 
-  // Questions to display in detail panel
   const visibleAnswers = useMemo(() => {
-    if (!selected || !test) return [];
+    if (!selected) return [];
     const answers: any[] = Array.isArray(selected.answers_json) ? selected.answers_json : [];
-    return test.questions
-      .map((q) => ({ question: q, ans: answers.find((a) => a.question_id === q.id) }))
+    return variantQuestions
+      .map((q) => ({ question: q, ans: answers.find((a: any) => a.question_id === q.id) }))
       .filter(({ question, ans }) => {
         if (!ans) return showAllQuestions;
         if (showAllQuestions) return true;
-        // Always show manual-grading questions and wrong answers
         if (question.type === 'OPEN_TEXT' || question.type === 'DRAWING') return true;
         return !isQuestionCorrect(ans, question);
       });
-  }, [selected, test, showAllQuestions]);
+  }, [selected, variantQuestions, showAllQuestions]);
 
   if (loading) return <Layout><div className="text-center text-gray-400 dark:text-slate-500 py-12">Загрузка...</div></Layout>;
 
@@ -124,7 +125,6 @@ export function TeacherTestResultsPage() {
     <Layout>
       <div className="max-w-7xl mx-auto space-y-4">
 
-        {/* Header */}
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/teacher/tests')} className="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200">
             ← Назад
@@ -133,9 +133,7 @@ export function TeacherTestResultsPage() {
           <span className="text-sm text-gray-400 dark:text-slate-500">{submissions.length} ответов</span>
         </div>
 
-        {/* Filters */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Search */}
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -149,7 +147,6 @@ export function TeacherTestResultsPage() {
             />
           </div>
 
-          {/* Status tabs */}
           <div className="flex rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden text-sm">
             {(['all', 'pending', 'checked'] as StatusFilter[]).map((s) => (
               <button
@@ -171,7 +168,7 @@ export function TeacherTestResultsPage() {
         </div>
 
         <div className="flex gap-5 items-start">
-          {/* Left: submissions table */}
+          {/* Submissions table */}
           <div className="flex-1 min-w-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
             {filtered.length === 0 ? (
               <div className="text-center text-gray-400 dark:text-slate-500 py-12 text-sm">
@@ -182,6 +179,7 @@ export function TeacherTestResultsPage() {
                 <thead className="bg-gray-50 dark:bg-slate-700/30 border-b border-gray-200 dark:border-slate-700">
                   <tr>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Курсант</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Вариант</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Авто</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Итог</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Статус</th>
@@ -203,6 +201,9 @@ export function TeacherTestResultsPage() {
                           {sub.student?.callsign}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-slate-400 text-xs">
+                        {sub.variant?.name ?? '—'}
+                      </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-slate-400">
                         {sub.auto_score != null ? `${sub.auto_score.toFixed(1)}%` : '—'}
                       </td>
@@ -220,15 +221,19 @@ export function TeacherTestResultsPage() {
             )}
           </div>
 
-          {/* Right: detail panel */}
+          {/* Detail panel */}
           {selected && test ? (
             <div className="w-[420px] shrink-0 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-              {/* Detail header */}
               <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-700 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h2 className="font-semibold text-gray-900 dark:text-slate-100">{selected.student?.callsign}</h2>
                     <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                      {selected.variant?.name && (
+                        <span className="mr-2 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-slate-300">
+                          {selected.variant.name}
+                        </span>
+                      )}
                       {new Date(selected.submitted_at).toLocaleString('ru-RU')}
                     </p>
                   </div>
@@ -240,7 +245,6 @@ export function TeacherTestResultsPage() {
                   </button>
                 </div>
 
-                {/* Score stats */}
                 <div className="flex items-center gap-3 flex-wrap">
                   {scoreStats && (
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-lg ${
@@ -258,7 +262,6 @@ export function TeacherTestResultsPage() {
                   </span>
                 </div>
 
-                {/* Show all toggle */}
                 <button
                   onClick={() => setShowAllQuestions((v) => !v)}
                   className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
@@ -267,7 +270,6 @@ export function TeacherTestResultsPage() {
                 </button>
               </div>
 
-              {/* Questions list */}
               <div className="overflow-y-auto flex-1 px-5 py-3 space-y-4">
                 {visibleAnswers.length === 0 && (
                   <p className="text-sm text-green-600 dark:text-green-400 py-4 text-center">
@@ -287,7 +289,7 @@ export function TeacherTestResultsPage() {
 
                       {(question.type === 'SINGLE' || question.type === 'MULTIPLE') && ans && (
                         <div className="space-y-1">
-                          {question.answers.map((a: any) => {
+                          {question.answers.map((a) => {
                             const chosen = (ans.answer_ids ?? []).includes(a.id);
                             return (
                               <div

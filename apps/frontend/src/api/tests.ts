@@ -17,6 +17,21 @@ export interface TestQuestion {
   answers: TestAnswer[];
 }
 
+export interface TestVariant {
+  id: string;
+  test_id: string;
+  name: string;
+  questions?: TestQuestion[];
+  assignments?: Array<{ student_id: string; student?: { id: string; callsign: string } }>;
+  _count?: { assignments: number };
+}
+
+export interface CohortStudent {
+  id: string;
+  callsign: string;
+  email: string;
+}
+
 export interface Test {
   id: string;
   title: string;
@@ -25,22 +40,37 @@ export interface Test {
   time_limit_min?: number | null;
   show_result_immediately: boolean;
   created_at: string;
-  questions: TestQuestion[];
+  variants: TestVariant[];
   _count?: { submissions: number };
   submissions?: Array<{ id: string; auto_score?: number | null; manual_score?: number | null; submitted_at: string }>;
+  variant_assignments?: Array<{ id: string; variant_id: string }>;
   cohort?: { id: string; name: string };
   day?: { id: string; day_number: number } | null;
+}
+
+// Response from GET /tests/:id for a student
+export interface StudentTestDetail {
+  id: string;
+  title: string;
+  cohort_id: string;
+  time_limit_min?: number | null;
+  show_result_immediately: boolean;
+  created_at: string;
+  assigned: boolean;
+  variant?: TestVariant;
 }
 
 export interface TestSubmission {
   id: string;
   test_id: string;
+  variant_id?: string | null;
   student_id: string;
   answers_json: any;
   auto_score?: number | null;
   manual_score?: number | null;
   submitted_at: string;
   student?: { id: string; callsign: string; email: string };
+  variant?: { id: string; name: string } | null;
 }
 
 export interface SubmitResult {
@@ -63,14 +93,18 @@ export const testsApi = {
   getQuestionImageUrl: (image_path: string) => `/api/tests/question-images/${image_path}`,
   getDrawingUrl: (filename: string) => `/api/tests/submission-drawings/${filename}`,
 
+  getCohortStudents: (cohortId: string) =>
+    client.get<CohortStudent[]>(`/tests/cohort-students/${cohortId}`),
+
   getTests: () => client.get<Test[]>('/tests'),
   getTest: (id: string) => client.get<Test>(`/tests/${id}`),
+  getStudentTest: (id: string) => client.get<StudentTestDetail>(`/tests/${id}`),
   createTest: (data: any) => client.post<Test>('/tests', data),
   updateTest: (id: string, data: any) => client.put<Test>(`/tests/${id}`, data),
   deleteTest: (id: string) => client.delete(`/tests/${id}`),
 
-  submitTest: (id: string, answers: any[]) =>
-    client.post<SubmitResult>(`/tests/${id}/submit`, { answers }),
+  submitTest: (id: string, answers: any[], variant_id: string) =>
+    client.post<SubmitResult>(`/tests/${id}/submit`, { answers, variant_id }),
 
   getResults: (id: string) => client.get<TestSubmission[]>(`/tests/${id}/results`),
   getMyResult: (id: string) => client.get<TestSubmission>(`/tests/${id}/results/my`),
