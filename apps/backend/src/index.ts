@@ -17,11 +17,14 @@ import { analyticsRoutes } from './routes/analytics';
 import { chatsRoutes } from './routes/chats';
 import { setupSocket } from './socket';
 
-const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
+const app = Fastify({ logger: true, bodyLimit: 55 * 1024 * 1024 });
+
+// Support multiple comma-separated origins: FRONTEND_URL=https://sokolbla.ru,https://www.sokolbla.ru
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',').map(s => s.trim());
 
 export const io = new SocketIOServer(app.server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -31,7 +34,7 @@ setupSocket(io);
 async function bootstrap() {
   await app.register(fastifyHelmet, { contentSecurityPolicy: false });
   await app.register(fastifyCors, {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   });
   await app.register(fastifyCookie, {
