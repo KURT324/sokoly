@@ -23,7 +23,79 @@ async function serveImage(reply: any, dir: string, filename: string) {
 }
 
 export async function cardTasksRoutes(app: FastifyInstance) {
-  // GET /api/card-tasks/students — list of students (for teacher assign form)
+  // ── Library ──────────────────────────────────────────────────────────────────
+
+  // GET /api/card-tasks/library
+  app.get('/library', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async () => {
+    return prisma.cardLibrary.findMany({
+      include: { created_by: { select: { id: true, callsign: true } } },
+      orderBy: { created_at: 'desc' },
+    });
+  });
+
+  // POST /api/card-tasks/library — upload card to library
+  app.post('/library', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const parts = request.parts();
+    let title = '';
+    let instructions = '';
+    let imagePath: string | null = null;
+
+    for await (const part of parts) {
+      if (part.type === 'field') {
+        if (part.fieldname === 'title') title = part.value as string;
+        else if (part.fieldname === 'instructions') instructions = part.value as string;
+      } else if (part.type === 'file' && part.fieldname === 'image') {
+        const ext = path.extname(part.filename).toLowerCase();
+        if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+          await part.file.resume();
+          return reply.status(400).send({ error: 'Image files only' });
+        }
+        await fs.mkdir(path.join(STORAGE_PATH, 'cards'), { recursive: true });
+        const filename = `${uuidv4()}${ext}`;
+        await pipeline(part.file, fsSync.createWriteStream(path.join(STORAGE_PATH, 'cards', filename)));
+        imagePath = filename;
+      }
+    }
+
+    if (!title.trim() || !instructions.trim() || !imagePath) {
+      return reply.status(400).send({ error: 'title, instructions and image are required' });
+    }
+
+    const card = await prisma.cardLibrary.create({
+      data: {
+        title: title.trim(),
+        instructions: instructions.trim(),
+        image_path: imagePath,
+        created_by_id: request.user!.id,
+      },
+      include: { created_by: { select: { id: true, callsign: true } } },
+    });
+
+    return reply.status(201).send(card);
+  });
+
+  // DELETE /api/card-tasks/library/:libId
+  app.delete('/library/:libId', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const { libId } = request.params as { libId: string };
+    const card = await prisma.cardLibrary.findUnique({ where: { id: libId } });
+    if (!card) return reply.status(404).send({ error: 'Not found' });
+
+    await prisma.cardTask.updateMany({ where: { library_id: libId }, data: { library_id: null } });
+    await prisma.cardLibrary.delete({ where: { id: libId } });
+    try { await fs.unlink(path.join(STORAGE_PATH, 'cards', card.image_path)); } catch {}
+
+    return reply.send({ ok: true });
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  // GET /api/card-tasks/students
   app.get('/students', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async () => {
@@ -40,7 +112,7 @@ export async function cardTasksRoutes(app: FastifyInstance) {
     return serveImage(reply, 'cards', filename);
   });
 
-  // GET /api/card-tasks/annotations/:filename — serve annotation image (teacher only)
+  // GET /api/card-tasks/annotations/:filename — serve annotation (teacher only)
   app.get('/annotations/:filename', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
@@ -48,7 +120,7 @@ export async function cardTasksRoutes(app: FastifyInstance) {
     return serveImage(reply, 'annotations', filename);
   });
 
-  // GET /api/card-tasks/student-annotations/:filename — serve annotation for the owning student
+  // GET /api/card-tasks/student-annotations/:filename — student sees own annotations only
   app.get('/student-annotations/:filename', { preHandler: authGuard }, async (request, reply) => {
     const user = request.user!;
     const { filename } = request.params as { filename: string };
@@ -57,7 +129,6 @@ export async function cardTasksRoutes(app: FastifyInstance) {
       return serveImage(reply, 'annotations', filename);
     }
 
-    // Students can only see their own annotations
     const attempt = await prisma.cardAttempt.findFirst({
       where: { annotation_path: filename, task: { student_id: user.id } },
     });
@@ -65,44 +136,31 @@ export async function cardTasksRoutes(app: FastifyInstance) {
     return serveImage(reply, 'annotations', filename);
   });
 
-  // POST /api/card-tasks — teacher creates a task
+  // ── Assignments ───────────────────────────────────────────────────────────────
+
+  // POST /api/card-tasks — assign library card to student (JSON body)
   app.post('/', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
-    const parts = request.parts();
-    let student_id = '';
-    let day_id = '';
-    let instructions = '';
-    let imagePath: string | null = null;
+    const { library_id, student_id, instructions } = request.body as {
+      library_id: string;
+      student_id: string;
+      instructions?: string;
+    };
 
-    for await (const part of parts) {
-      if (part.type === 'field') {
-        if (part.fieldname === 'student_id') student_id = part.value as string;
-        else if (part.fieldname === 'day_id') day_id = part.value as string;
-        else if (part.fieldname === 'instructions') instructions = part.value as string;
-      } else if (part.type === 'file' && part.fieldname === 'image') {
-        const ext = path.extname(part.filename).toLowerCase();
-        if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
-          await part.file.resume();
-          return reply.status(400).send({ error: 'Image files only' });
-        }
-        await fs.mkdir(path.join(STORAGE_PATH, 'cards'), { recursive: true });
-        const filename = `${uuidv4()}${ext}`;
-        await pipeline(part.file, fsSync.createWriteStream(path.join(STORAGE_PATH, 'cards', filename)));
-        imagePath = filename;
-      }
+    if (!library_id || !student_id) {
+      return reply.status(400).send({ error: 'library_id and student_id are required' });
     }
 
-    if (!student_id || !day_id || !imagePath || !instructions) {
-      return reply.status(400).send({ error: 'student_id, day_id, image and instructions are required' });
-    }
+    const libCard = await prisma.cardLibrary.findUnique({ where: { id: library_id } });
+    if (!libCard) return reply.status(404).send({ error: 'Library card not found' });
 
     const task = await prisma.cardTask.create({
       data: {
         student_id,
-        day_id,
-        image_path: imagePath,
-        instructions,
+        library_id,
+        image_path: libCard.image_path,
+        instructions: instructions?.trim() || libCard.instructions,
         created_by_id: request.user!.id,
         status: CardTaskStatus.PENDING,
       },
@@ -112,37 +170,35 @@ export async function cardTasksRoutes(app: FastifyInstance) {
     return reply.status(201).send(task);
   });
 
-  // GET /api/card-tasks/my — student's active task
+  // GET /api/card-tasks/my — student: all their tasks
   app.get('/my', {
     preHandler: roleGuard(UserRole.STUDENT),
   }, async (request) => {
     const student_id = request.user!.id;
-    const task = await prisma.cardTask.findFirst({
-      where: { student_id, status: { not: CardTaskStatus.COMPLETED } },
+    return prisma.cardTask.findMany({
+      where: { student_id },
+      include: { attempts: { orderBy: { attempt_number: 'asc' } } },
+      orderBy: { created_at: 'desc' },
+    });
+  });
+
+  // GET /api/card-tasks — teacher: all assignments (optional ?status= filter)
+  app.get('/', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request) => {
+    const { status } = request.query as { status?: string };
+    return prisma.cardTask.findMany({
+      where: status ? { status: status as CardTaskStatus } : undefined,
       include: {
-        attempts: { orderBy: { attempt_number: 'desc' } },
-        day: { select: { id: true, day_number: true } },
+        student: { select: { id: true, callsign: true } },
+        library: { select: { id: true, title: true } },
+        attempts: { orderBy: { attempt_number: 'desc' }, take: 1 },
       },
       orderBy: { created_at: 'desc' },
     });
-    return task ?? null;
   });
 
-  // GET /api/card-tasks — teacher: tasks awaiting review
-  app.get('/', {
-    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
-  }, async () => {
-    return prisma.cardTask.findMany({
-      where: { status: CardTaskStatus.AWAITING_REVIEW },
-      include: {
-        student: { select: { id: true, callsign: true } },
-        attempts: { orderBy: { attempt_number: 'desc' }, take: 1 },
-      },
-      orderBy: { created_at: 'asc' },
-    });
-  });
-
-  // GET /api/card-tasks/:id — teacher: task detail + all attempts
+  // GET /api/card-tasks/:id — task detail
   app.get('/:id', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
@@ -151,8 +207,8 @@ export async function cardTasksRoutes(app: FastifyInstance) {
       where: { id },
       include: {
         student: { select: { id: true, callsign: true, email: true } },
+        library: { select: { id: true, title: true } },
         attempts: { orderBy: { attempt_number: 'asc' } },
-        day: { select: { id: true, day_number: true } },
       },
     });
     if (!task) return reply.status(404).send({ error: 'Not Found' });
@@ -231,11 +287,7 @@ export async function cardTasksRoutes(app: FastifyInstance) {
     const [updatedAttempt] = await prisma.$transaction([
       prisma.cardAttempt.update({
         where: { id: attId },
-        data: {
-          is_correct,
-          teacher_comment: teacher_comment ?? null,
-          reviewed_at: new Date(),
-        },
+        data: { is_correct, teacher_comment: teacher_comment ?? null, reviewed_at: new Date() },
       }),
       prisma.cardTask.update({
         where: { id },

@@ -14,16 +14,25 @@ export interface CardAttempt {
   reviewed_at?: string | null;
 }
 
+export interface CardLibrary {
+  id: string;
+  title: string;
+  instructions: string;
+  image_path: string;
+  created_at: string;
+  created_by?: { id: string; callsign: string };
+}
+
 export interface CardTask {
   id: string;
   student_id: string;
-  day_id: string;
+  library_id?: string | null;
   image_path: string;
   instructions: string;
   status: CardTaskStatus;
   created_at: string;
   student?: { id: string; callsign: string; email?: string };
-  day?: { id: string; day_number: number };
+  library?: { id: string; title: string } | null;
   attempts: CardAttempt[];
 }
 
@@ -35,21 +44,29 @@ export interface StudentInfo {
 }
 
 export const cardTasksApi = {
+  // Library
+  getLibrary: () => client.get<CardLibrary[]>('/card-tasks/library'),
+  uploadToLibrary: (data: FormData) =>
+    client.post<CardLibrary>('/card-tasks/library', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  deleteFromLibrary: (libId: string) => client.delete(`/card-tasks/library/${libId}`),
+
+  // Students list for assign form
   getStudents: () => client.get<StudentInfo[]>('/card-tasks/students'),
 
+  // Image / annotation URLs
   getImageUrl: (filename: string) => `/api/card-tasks/images/${filename}`,
   getAnnotationUrl: (filename: string) => `/api/card-tasks/annotations/${filename}`,
   getStudentAnnotationUrl: (filename: string) => `/api/card-tasks/student-annotations/${filename}`,
 
-  createTask: (data: FormData) =>
-    client.post<CardTask>('/card-tasks', data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+  // Assignments
+  assignTask: (library_id: string, student_id: string, instructions?: string) =>
+    client.post<CardTask>('/card-tasks', { library_id, student_id, instructions }),
 
-  getMyTask: () => client.get<CardTask | null>('/card-tasks/my'),
-
-  getPendingTasks: () => client.get<CardTask[]>('/card-tasks'),
-
+  getMyTasks: () => client.get<CardTask[]>('/card-tasks/my'),
+  getAllAssignments: (status?: string) =>
+    client.get<CardTask[]>('/card-tasks', { params: status ? { status } : undefined }),
   getTask: (id: string) => client.get<CardTask>(`/card-tasks/${id}`),
 
   submitAttempt: (id: string, data: FormData) =>

@@ -67,6 +67,7 @@ model User {
   test_submissions TestSubmission[]
   card_tasks       CardTask[]       @relation("AssignedTo")
   created_tasks    CardTask[]       @relation("CreatedBy")
+  library_cards    CardLibrary[]    @relation("LibraryCreatedBy")
   chat_messages    ChatMessage[]
 
   @@map("users")
@@ -179,10 +180,25 @@ model TestSubmission {
   @@map("test_submissions")
 }
 
+model CardLibrary {
+  id             String   @id @default(uuid())
+  title          String
+  instructions   String
+  image_path     String
+  created_by_id  String
+  created_at     DateTime @default(now())
+
+  created_by User       @relation("LibraryCreatedBy", fields: [created_by_id], references: [id])
+  tasks      CardTask[]
+
+  @@map("card_libraries")
+}
+
 model CardTask {
   id             String         @id @default(uuid())
   student_id     String
-  day_id         String
+  day_id         String?
+  library_id     String?
   image_path     String
   instructions   String
   status         CardTaskStatus @default(PENDING)
@@ -190,7 +206,8 @@ model CardTask {
   created_at     DateTime       @default(now())
 
   student    User          @relation("AssignedTo", fields: [student_id], references: [id])
-  day        Day           @relation(fields: [day_id], references: [id])
+  day        Day?          @relation(fields: [day_id], references: [id])
+  library    CardLibrary?  @relation(fields: [library_id], references: [id])
   created_by User          @relation("CreatedBy", fields: [created_by_id], references: [id])
   attempts   CardAttempt[]
 
