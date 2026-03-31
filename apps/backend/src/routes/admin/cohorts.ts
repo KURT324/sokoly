@@ -82,8 +82,8 @@ export async function adminCohortsRoutes(app: FastifyInstance) {
     await prisma.cardTask.deleteMany({ where: { day_id: { in: dayIds } } });
     // 4. Test submissions → tests
     await prisma.testSubmission.deleteMany({ where: { test: { cohort_id: id } } });
-    await prisma.testAnswer.deleteMany({ where: { question: { test: { cohort_id: id } } } });
-    await prisma.testQuestion.deleteMany({ where: { test: { cohort_id: id } } });
+    await prisma.testAnswer.deleteMany({ where: { question: { variant: { test: { cohort_id: id } } } } });
+    await prisma.testQuestion.deleteMany({ where: { variant: { test: { cohort_id: id } } } });
     await prisma.test.deleteMany({ where: { cohort_id: id } });
     // 5. Materials → days
     await prisma.material.deleteMany({ where: { day: { cohort_id: id } } });
