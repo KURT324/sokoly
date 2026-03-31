@@ -110,8 +110,8 @@ function FolderTile({
 }: {
   folder: CardFolder & { _count: { cards: number } };
   onClick: () => void;
-  onRename: (folder: CardFolder) => void;
-  onDelete: (folder: CardFolder) => void;
+  onRename: (folder: CardFolder & { _count: { cards: number } }) => void;
+  onDelete: (folder: CardFolder & { _count: { cards: number } }) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `folder-${folder.id}`, data: { type: 'folder', folderId: folder.id } });
 
