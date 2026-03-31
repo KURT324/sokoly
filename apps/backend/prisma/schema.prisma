@@ -68,6 +68,7 @@ model User {
   card_tasks       CardTask[]       @relation("AssignedTo")
   created_tasks    CardTask[]       @relation("CreatedBy")
   library_cards    CardLibrary[]    @relation("LibraryCreatedBy")
+  card_folders     CardFolder[]     @relation("FolderCreatedBy")
   chat_messages    ChatMessage[]
 
   @@map("users")
@@ -180,15 +181,29 @@ model TestSubmission {
   @@map("test_submissions")
 }
 
+model CardFolder {
+  id             String   @id @default(uuid())
+  name           String
+  created_by_id  String
+  created_at     DateTime @default(now())
+
+  created_by User          @relation("FolderCreatedBy", fields: [created_by_id], references: [id])
+  cards      CardLibrary[]
+
+  @@map("card_folders")
+}
+
 model CardLibrary {
   id             String   @id @default(uuid())
   title          String
   instructions   String
   image_path     String
+  folder_id      String?
   created_by_id  String
   created_at     DateTime @default(now())
 
-  created_by User       @relation("LibraryCreatedBy", fields: [created_by_id], references: [id])
+  created_by User        @relation("LibraryCreatedBy", fields: [created_by_id], references: [id])
+  folder     CardFolder? @relation(fields: [folder_id], references: [id], onDelete: SetNull)
   tasks      CardTask[]
 
   @@map("card_libraries")

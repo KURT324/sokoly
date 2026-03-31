@@ -14,11 +14,20 @@ export interface CardAttempt {
   reviewed_at?: string | null;
 }
 
+export interface CardFolder {
+  id: string;
+  name: string;
+  created_at: string;
+  _count?: { cards: number };
+}
+
 export interface CardLibrary {
   id: string;
   title: string;
   instructions: string;
   image_path: string;
+  folder_id?: string | null;
+  folder?: { id: string; name: string } | null;
   created_at: string;
   created_by?: { id: string; callsign: string };
 }
@@ -51,6 +60,15 @@ export const cardTasksApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   deleteFromLibrary: (libId: string) => client.delete(`/card-tasks/library/${libId}`),
+
+  // Folders
+  getFolders: () => client.get<CardFolder[]>('/card-folders'),
+  createFolder: (name: string) => client.post<CardFolder>('/card-folders', { name }),
+  renameFolder: (id: string, name: string) => client.patch<CardFolder>(`/card-folders/${id}`, { name }),
+  deleteFolder: (id: string, force = false) =>
+    client.delete(`/card-folders/${id}${force ? '?force=true' : ''}`),
+  moveCard: (cardId: string, folder_id: string | null) =>
+    client.patch(`/card-folders/move-card/${cardId}`, { folder_id }),
 
   // Students list for assign form
   getStudents: () => client.get<StudentInfo[]>('/card-tasks/students'),

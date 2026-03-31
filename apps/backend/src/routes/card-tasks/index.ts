@@ -30,7 +30,10 @@ export async function cardTasksRoutes(app: FastifyInstance) {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async () => {
     return prisma.cardLibrary.findMany({
-      include: { created_by: { select: { id: true, callsign: true } } },
+      include: {
+        created_by: { select: { id: true, callsign: true } },
+        folder: { select: { id: true, name: true } },
+      },
       orderBy: { created_at: 'desc' },
     });
   });
