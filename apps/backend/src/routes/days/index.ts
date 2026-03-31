@@ -10,7 +10,8 @@ import { authGuard, roleGuard } from '../../middleware/authGuard';
 import { applyImageWatermark, applyPdfWatermark } from '../../services/watermark';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
-const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE_MB || '50') * 1024 * 1024;
+const VIDEO_MAX_SIZE = 500 * 1024 * 1024;  // 500 MB for video
+const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50 MB for other files
 
 const EXT_TO_TYPE: Record<string, MaterialType> = {
   '.pdf': MaterialType.PDF,
@@ -20,9 +21,20 @@ const EXT_TO_TYPE: Record<string, MaterialType> = {
   '.jpeg': MaterialType.IMAGE,
   '.png': MaterialType.IMAGE,
   '.webp': MaterialType.IMAGE,
+  '.mp4': MaterialType.VIDEO,
+  '.avi': MaterialType.VIDEO,
+  '.mov': MaterialType.VIDEO,
+  '.mkv': MaterialType.VIDEO,
 };
 
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const VIDEO_EXTS = new Set(['.mp4', '.avi', '.mov', '.mkv']);
+const VIDEO_MIME: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.avi': 'video/x-msvideo',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+};
 
 export async function daysRoutes(app: FastifyInstance) {
   // GET /api/days — list days
@@ -116,13 +128,14 @@ export async function daysRoutes(app: FastifyInstance) {
       return reply.status(201).send(material);
     }
 
-    const data = await request.file({ limits: { fileSize: MAX_FILE_SIZE } });
+    // Peek at filename from multipart headers to decide size limit
+    const data = await request.file({ limits: { fileSize: VIDEO_MAX_SIZE } });
     if (!data) return reply.status(400).send({ error: 'No file provided' });
 
     const ext = path.extname(data.filename).toLowerCase();
     const type = EXT_TO_TYPE[ext];
     if (!type) {
-      return reply.status(400).send({ error: 'Bad Request', message: 'Unsupported file type' });
+      return reply.status(400).send({ error: 'Bad Request', message: 'Unsupported file type. Allowed: PDF, DOC, DOCX, JPG, PNG, WEBP, MP4, AVI, MOV, MKV' });
     }
 
     // Ensure storage directory exists
@@ -212,6 +225,38 @@ export async function daysRoutes(app: FastifyInstance) {
     const fullName = fullUserRecord?.callsign ?? user.callsign;
     const watermarkId = fullUserRecord?.watermark_id ?? user.id.slice(0, 8);
 
+    // Video — stream with Range request support (no watermark, no buffering)
+    if (VIDEO_EXTS.has(ext)) {
+      const stat = await fs.stat(filePath);
+      const fileSize = stat.size;
+      const mimeType = VIDEO_MIME[ext] || 'video/mp4';
+      const range = request.headers.range;
+
+      reply
+        .header('Content-Type', mimeType)
+        .header('Content-Disposition', 'inline')
+        .header('Cache-Control', 'no-store')
+        .header('Accept-Ranges', 'bytes');
+
+      if (range) {
+        const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(startStr, 10);
+        const end = endStr ? parseInt(endStr, 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+        const stream = fsSync.createReadStream(filePath, { start, end });
+        return reply
+          .status(206)
+          .header('Content-Range', `bytes ${start}-${end}/${fileSize}`)
+          .header('Content-Length', String(chunkSize))
+          .send(stream);
+      } else {
+        const stream = fsSync.createReadStream(filePath);
+        return reply
+          .header('Content-Length', String(fileSize))
+          .send(stream);
+      }
+    }
+
     let fileBuffer: Buffer;
     let mimeType: string;
 
@@ -222,7 +267,7 @@ export async function daysRoutes(app: FastifyInstance) {
       fileBuffer = await applyPdfWatermark(filePath, fullName, watermarkId);
       mimeType = 'application/pdf';
     } else {
-      // DOC/DOCX — serve as-is (no watermark for doc files)
+      // DOC/DOCX — serve as-is
       fileBuffer = await fs.readFile(filePath);
       mimeType = 'application/octet-stream';
     }

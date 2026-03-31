@@ -8,8 +8,6 @@ dist/
 apps/backend/src/storage/*
 !apps/backend/src/storage/.gitkeep
 
-# Prisma
-apps/backend/prisma/migrations/
 
 # Logs
 *.log

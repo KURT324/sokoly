@@ -11,6 +11,7 @@ const TYPE_ICONS: Record<MaterialType, string> = {
   [MaterialType.DOC]: '📝',
   [MaterialType.IMAGE]: '🖼️',
   [MaterialType.LINK]: '🔗',
+  [MaterialType.VIDEO]: '🎬',
 };
 
 const TYPE_LABELS: Record<MaterialType, string> = {
@@ -18,6 +19,7 @@ const TYPE_LABELS: Record<MaterialType, string> = {
   [MaterialType.DOC]: 'Документ',
   [MaterialType.IMAGE]: 'Изображение',
   [MaterialType.LINK]: 'Ссылка',
+  [MaterialType.VIDEO]: 'Видео',
 };
 
 export function StudentDayDetailPage() {
@@ -91,7 +93,7 @@ export function StudentDayDetailPage() {
       {viewer && (
         <ProtectedViewer
           url={viewer.url}
-          type={viewer.type as 'IMAGE' | 'PDF' | 'LINK' | 'DOC'}
+          type={viewer.type as 'IMAGE' | 'PDF' | 'LINK' | 'DOC' | 'VIDEO'}
           title={viewer.title}
           onClose={() => setViewer(null)}
         />

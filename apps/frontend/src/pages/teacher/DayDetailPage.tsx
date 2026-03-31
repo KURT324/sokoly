@@ -9,6 +9,7 @@ const TYPE_ICONS: Record<MaterialType, string> = {
   [MaterialType.DOC]: '📝',
   [MaterialType.IMAGE]: '🖼️',
   [MaterialType.LINK]: '🔗',
+  [MaterialType.VIDEO]: '🎬',
 };
 
 function formatBytes(bytes: number | null): string {
@@ -44,14 +45,18 @@ export function TeacherDayDetailPage() {
 
   const handleFileUpload = async (file: File) => {
     if (!dayId) return;
-    const allowed = ['application/pdf', 'application/msword',
+    const videoTypes = ['video/mp4', 'video/x-msvideo', 'video/quicktime', 'video/x-matroska'];
+    const docTypes = ['application/pdf', 'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'image/jpeg', 'image/png', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      return setError('Неподдерживаемый формат. Разрешены: PDF, DOC, DOCX, JPG, PNG, WEBP');
+    const isVideo = videoTypes.includes(file.type) || /\.(mp4|avi|mov|mkv)$/i.test(file.name);
+    const allowed = [...docTypes, ...videoTypes];
+    if (!allowed.includes(file.type) && !isVideo) {
+      return setError('Неподдерживаемый формат. Разрешены: PDF, DOC, DOCX, JPG, PNG, WEBP, MP4, AVI, MOV, MKV');
     }
-    if (file.size > 50 * 1024 * 1024) {
-      return setError('Файл слишком большой. Максимум 50 МБ');
+    const maxSize = isVideo ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return setError(isVideo ? 'Видео слишком большое. Максимум 500 МБ' : 'Файл слишком большой. Максимум 50 МБ');
     }
     setError('');
     setUploading(true);
@@ -132,7 +137,7 @@ export function TeacherDayDetailPage() {
             <>
               <div className="text-3xl mb-2">📁</div>
               <p className="text-sm text-gray-600 dark:text-slate-400 mb-3">Перетащите файл или нажмите для выбора</p>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">PDF, DOCX, JPG, PNG, WEBP — до 50 МБ</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">PDF, DOCX, JPG, PNG, WEBP — до 50 МБ &nbsp;|&nbsp; MP4, AVI, MOV, MKV — до 500 МБ</p>
               <div className="flex gap-2 justify-center">
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -153,7 +158,7 @@ export function TeacherDayDetailPage() {
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.mp4,.avi,.mov,.mkv"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
           />
         </div>

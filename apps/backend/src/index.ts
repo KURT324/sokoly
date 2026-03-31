@@ -20,7 +20,7 @@ import { setupSocket } from './socket';
 // BigInt is not JSON-serializable by default; Prisma returns BigInt for some aggregate fields
 (BigInt.prototype as any).toJSON = function () { return this.toString(); };
 
-const app = Fastify({ logger: true, bodyLimit: 55 * 1024 * 1024 });
+const app = Fastify({ logger: true, bodyLimit: 510 * 1024 * 1024 });
 
 // Support multiple comma-separated origins: FRONTEND_URL=https://sokolbla.ru,https://www.sokolbla.ru
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',').map(s => s.trim());
@@ -44,7 +44,7 @@ async function bootstrap() {
     secret: process.env.JWT_SECRET || 'secret',
   });
   await app.register(fastifyMultipart, {
-    limits: { fileSize: 50 * 1024 * 1024 },
+    limits: { fileSize: 500 * 1024 * 1024 },
   });
   await app.register(fastifyRateLimit, {
     global: false,

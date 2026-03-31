@@ -8,7 +8,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 
 interface ProtectedViewerProps {
   url: string;
-  type: 'IMAGE' | 'PDF' | 'LINK' | 'DOC';
+  type: 'IMAGE' | 'PDF' | 'LINK' | 'DOC' | 'VIDEO';
   title: string;
   onClose: () => void;
 }
@@ -137,6 +137,23 @@ export function ProtectedViewer({ url, type, title, onClose }: ProtectedViewerPr
             >
               Открыть документ
             </a>
+          </div>
+        )}
+
+        {type === 'VIDEO' && (
+          <div
+            className="w-full max-w-4xl"
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <video
+              src={url}
+              controls
+              controlsList="nodownload"
+              disablePictureInPicture
+              onContextMenu={(e) => e.preventDefault()}
+              className="w-full rounded-lg"
+              style={{ userSelect: 'none' }}
+            />
           </div>
         )}
       </div>

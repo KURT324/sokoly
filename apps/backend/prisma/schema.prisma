@@ -25,6 +25,7 @@ enum MaterialType {
   DOC
   IMAGE
   LINK
+  VIDEO
 }
 
 enum QuestionType {

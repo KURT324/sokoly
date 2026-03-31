@@ -16,6 +16,7 @@ export enum MaterialType {
   DOC = 'DOC',
   IMAGE = 'IMAGE',
   LINK = 'LINK',
+  VIDEO = 'VIDEO',
 }
 
 export enum QuestionType {
