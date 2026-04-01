@@ -14,6 +14,7 @@ import { testsRoutes } from './routes/tests';
 import { cohortsRoutes } from './routes/cohorts';
 import { cardTasksRoutes } from './routes/card-tasks';
 import { cardFoldersRoutes } from './routes/card-folders';
+import { materialLibraryRoutes } from './routes/material-library';
 import { analyticsRoutes } from './routes/analytics';
 import { chatsRoutes } from './routes/chats';
 import { setupSocket } from './socket';
@@ -69,6 +70,7 @@ async function bootstrap() {
   app.register(cohortsRoutes, { prefix: '/api/cohorts' });
   app.register(cardTasksRoutes, { prefix: '/api/card-tasks' });
   app.register(cardFoldersRoutes, { prefix: '/api/card-folders' });
+  app.register(materialLibraryRoutes, { prefix: '/api/material-library' });
   app.register(analyticsRoutes, { prefix: '/api/analytics' });
   app.register(chatsRoutes, { prefix: '/api/chats' });
 

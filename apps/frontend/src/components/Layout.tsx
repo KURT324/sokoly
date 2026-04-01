@@ -175,6 +175,7 @@ const MAIN_NAV: Record<UserRole, NavItem[]> = {
     { label: 'Учебные дни',  to: '/teacher/days',       icon: <IconCalendar /> },
     { label: 'Тесты',        to: '/teacher/tests',      icon: <IconClipboard /> },
     { label: 'Карточки',     to: '/teacher/cards',      icon: <IconCard /> },
+    { label: 'Библиотека',   to: '/teacher/library',    icon: <IconBook /> },
     { label: 'Аналитика',    to: '/admin/analytics',    icon: <IconChart /> },
   ],
   [UserRole.TEACHER]: [
@@ -182,6 +183,7 @@ const MAIN_NAV: Record<UserRole, NavItem[]> = {
     { label: 'Учебные дни', to: '/teacher/days',        icon: <IconCalendar /> },
     { label: 'Тесты',       to: '/teacher/tests',       icon: <IconClipboard /> },
     { label: 'Карточки',    to: '/teacher/cards',       icon: <IconCard /> },
+    { label: 'Библиотека',  to: '/teacher/library',     icon: <IconBook /> },
     { label: 'Аналитика',   to: '/teacher/analytics',   icon: <IconChart /> },
   ],
   [UserRole.STUDENT]: [

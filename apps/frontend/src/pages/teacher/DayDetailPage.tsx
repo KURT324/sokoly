@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { daysApi, DayRecord, MaterialRecord } from '../../api/days';
+import { materialLibraryApi, LibraryItem } from '../../api/materialLibrary';
 import { MaterialType } from '@eduplatform/shared';
 import { Layout } from '../../components/Layout';
 
@@ -33,6 +34,12 @@ export function TeacherDayDetailPage() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
 
+  // Library modal
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [attaching, setAttaching] = useState<string | null>(null);
+
   const load = () => {
     if (!dayId) return;
     daysApi.getDay(dayId).then((r) => {
@@ -42,6 +49,46 @@ export function TeacherDayDetailPage() {
   };
 
   useEffect(() => { load(); }, [dayId]);
+
+  const openLibrary = () => {
+    setShowLibrary(true);
+    setLibrarySearch('');
+    materialLibraryApi.getLibrary().then((r) => setLibraryItems(r.data));
+  };
+
+  const handleAttach = async (item: LibraryItem) => {
+    if (!dayId || attaching) return;
+    setAttaching(item.id);
+    try {
+      await materialLibraryApi.attachToDay(item.id, dayId);
+      load();
+      setShowLibrary(false);
+    } finally {
+      setAttaching(null);
+    }
+  };
+
+  // Group library items by folder for the modal
+  const libraryGrouped = useMemo(() => {
+    const filtered = librarySearch
+      ? libraryItems.filter((i) =>
+          i.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
+          (i.folder ?? '').toLowerCase().includes(librarySearch.toLowerCase()),
+        )
+      : libraryItems;
+    const map = new Map<string, LibraryItem[]>();
+    for (const item of filtered) {
+      const key = item.folder || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    }
+    const sorted = [...map.keys()].sort((a, b) => {
+      if (a === '' && b !== '') return 1;
+      if (a !== '' && b === '') return -1;
+      return a.localeCompare(b, 'ru');
+    });
+    return sorted.map((k) => [k, map.get(k)!] as [string, LibraryItem[]]);
+  }, [libraryItems, librarySearch]);
 
   const handleFileUpload = async (file: File) => {
     if (!dayId) return;
@@ -138,7 +185,7 @@ export function TeacherDayDetailPage() {
               <div className="text-3xl mb-2">📁</div>
               <p className="text-sm text-gray-600 dark:text-slate-400 mb-3">Перетащите файл или нажмите для выбора</p>
               <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">PDF, DOCX, JPG, PNG, WEBP — до 50 МБ &nbsp;|&nbsp; MP4, AVI, MOV, MKV — до 500 МБ</p>
-              <div className="flex gap-2 justify-center">
+              <div className="flex gap-2 justify-center flex-wrap">
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors"
@@ -150,6 +197,12 @@ export function TeacherDayDetailPage() {
                   className="border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 text-sm px-4 py-2 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
                 >
                   + Добавить ссылку
+                </button>
+                <button
+                  onClick={openLibrary}
+                  className="border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 text-sm px-4 py-2 rounded-lg font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                >
+                  📚 Из библиотеки
                 </button>
               </div>
             </>
@@ -233,6 +286,86 @@ export function TeacherDayDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Library modal */}
+      {showLibrary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowLibrary(false)} />
+          <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '80vh' }}>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-slate-700 shrink-0">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">Библиотека материалов</h2>
+              <button onClick={() => setShowLibrary(false)} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+
+            {/* Search */}
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-slate-700 shrink-0">
+              <input
+                type="text"
+                placeholder="Поиск по названию или папке..."
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+
+            {/* Items */}
+            <div className="overflow-y-auto flex-1 px-2 py-2">
+              {libraryGrouped.length === 0 ? (
+                <p className="text-center text-gray-400 dark:text-slate-500 text-sm py-8">
+                  {libraryItems.length === 0 ? 'Библиотека пуста' : 'Ничего не найдено'}
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {libraryGrouped.map(([folder, groupItems]) => (
+                    <div key={folder || '__ungrouped__'}>
+                      <div className="flex items-center gap-1.5 px-3 py-1">
+                        <span className="text-sm">📂</span>
+                        <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
+                          {folder || 'Без папки'}
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {groupItems.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleAttach(item)}
+                            disabled={attaching === item.id}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 text-left transition-colors disabled:opacity-50"
+                          >
+                            <span className="text-xl shrink-0">{
+                              item.type === 'PDF' ? '📄' :
+                              item.type === 'DOC' ? '📝' :
+                              item.type === 'IMAGE' ? '🖼️' :
+                              item.type === 'LINK' ? '🔗' : '🎬'
+                            }</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{item.title}</div>
+                              {item.size_bytes && (
+                                <div className="text-xs text-gray-400 dark:text-slate-500">
+                                  {item.size_bytes < 1024 * 1024
+                                    ? `${(item.size_bytes / 1024).toFixed(0)} КБ`
+                                    : `${(item.size_bytes / (1024 * 1024)).toFixed(1)} МБ`}
+                                </div>
+                              )}
+                            </div>
+                            {attaching === item.id ? (
+                              <span className="text-xs text-gray-400 dark:text-slate-500 shrink-0">...</span>
+                            ) : (
+                              <span className="text-xs text-indigo-600 dark:text-indigo-400 shrink-0 font-medium">Прикрепить</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

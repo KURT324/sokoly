@@ -71,6 +71,7 @@ model User {
   card_folders     CardFolder[]     @relation("FolderCreatedBy")
   chat_messages        ChatMessage[]
   variant_assignments  TestVariantAssignment[]
+  library_materials    MaterialLibrary[]       @relation("LibraryMaterialCreatedBy")
 
   @@map("users")
 }
@@ -107,9 +108,27 @@ model Day {
   @@map("days")
 }
 
+model MaterialLibrary {
+  id            String       @id @default(uuid())
+  type          MaterialType
+  title         String
+  folder        String?
+  storage_path  String?
+  url           String?
+  size_bytes    BigInt?
+  created_by_id String
+  created_at    DateTime     @default(now())
+
+  created_by User       @relation("LibraryMaterialCreatedBy", fields: [created_by_id], references: [id])
+  materials  Material[]
+
+  @@map("material_libraries")
+}
+
 model Material {
   id           String       @id @default(uuid())
   day_id       String
+  library_id   String?
   type         MaterialType
   title        String
   storage_path String?
@@ -117,7 +136,8 @@ model Material {
   size_bytes   BigInt?
   created_at   DateTime     @default(now())
 
-  day Day @relation(fields: [day_id], references: [id])
+  day     Day              @relation(fields: [day_id], references: [id])
+  library MaterialLibrary? @relation(fields: [library_id], references: [id], onDelete: SetNull)
 
   @@map("materials")
 }
