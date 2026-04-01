@@ -162,6 +162,21 @@ export function TeacherDayDetailPage() {
             {day.status === 'OPEN' ? 'Открыт' : day.status === 'LOCKED' ? 'Закрыт' : 'Архив'}
           </span>
           {day.cohort && <span className="text-sm text-gray-500 dark:text-slate-400">{day.cohort.name}</span>}
+          {day.status !== 'ARCHIVED' && (
+            <button
+              onClick={async () => {
+                const r = await daysApi.toggleDay(dayId!);
+                setDay(r.data);
+              }}
+              className={`ml-auto text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                day.status === 'OPEN'
+                  ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800'
+                  : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 border border-green-200 dark:border-green-800'
+              }`}
+            >
+              {day.status === 'OPEN' ? 'Закрыть день' : 'Открыть день'}
+            </button>
+          )}
         </div>
 
         {/* Upload zone */}

@@ -78,30 +78,40 @@ export async function daysRoutes(app: FastifyInstance) {
     if (user.role === UserRole.STUDENT) {
       if (day.cohort_id !== user.cohort_id)
         return reply.status(403).send({ error: 'Forbidden' });
-      if (day.status !== 'OPEN')
-        return reply.status(403).send({ error: 'Forbidden', message: 'Day is not open' });
+      if (day.status !== 'OPEN') {
+        return { ...day, materials: [] };
+      }
     }
 
     return day;
   });
 
-  // PATCH /api/days/:id/open — open day
-  app.patch('/:id/open', { preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN) }, async (request, reply) => {
+  // PATCH /api/days/:id/toggle — toggle day LOCKED↔OPEN
+  app.patch('/:id/toggle', { preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN) }, async (request, reply) => {
     const { id } = request.params as { id: string };
 
     const day = await prisma.day.findUnique({ where: { id } });
     if (!day) return reply.status(404).send({ error: 'Not Found' });
-    if (day.status !== 'LOCKED')
-      return reply.status(400).send({ error: 'Bad Request', message: 'Day is already open or archived' });
+    if (day.status === 'ARCHIVED')
+      return reply.status(400).send({ error: 'Bad Request', message: 'Archived days cannot be toggled' });
 
+    const newStatus = day.status === 'OPEN' ? 'LOCKED' : 'OPEN';
     const updated = await prisma.day.update({
       where: { id },
-      data: { status: 'OPEN', opened_at: new Date(), opened_by_id: request.user!.id },
+      data: {
+        status: newStatus,
+        opened_at: newStatus === 'OPEN' ? new Date() : day.opened_at,
+        opened_by_id: newStatus === 'OPEN' ? request.user!.id : day.opened_by_id,
+      },
     });
 
     // Notify students via Socket.IO
     const { io } = await import('../../index');
-    io.to(`cohort:${day.cohort_id}`).emit('day:opened', { dayId: id, dayNumber: day.day_number });
+    if (newStatus === 'OPEN') {
+      io.to(`cohort:${day.cohort_id}`).emit('day:opened', { dayId: id, dayNumber: day.day_number });
+    } else {
+      io.to(`cohort:${day.cohort_id}`).emit('day:closed', { dayId: id, dayNumber: day.day_number });
+    }
 
     return updated;
   });

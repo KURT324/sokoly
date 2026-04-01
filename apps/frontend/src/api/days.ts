@@ -47,6 +47,9 @@ export const daysApi = {
   addLink: (dayId: string, url: string, title: string) =>
     client.post<MaterialRecord>(`/days/${dayId}/materials`, { url, title }),
 
+  toggleDay: (id: string) =>
+    client.patch<DayRecord>(`/days/${id}/toggle`),
+
   deleteMaterial: (dayId: string, matId: string) =>
     client.delete(`/days/${dayId}/materials/${matId}`),
 
