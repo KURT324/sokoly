@@ -30,9 +30,6 @@ export const daysApi = {
   getDay: (id: string) =>
     client.get<DayRecord>(`/days/${id}`),
 
-  openDay: (id: string) =>
-    client.patch(`/days/${id}/open`),
-
   uploadMaterial: (dayId: string, file: File, title: string, onProgress?: (p: number) => void) => {
     const form = new FormData();
     form.append('file', file);

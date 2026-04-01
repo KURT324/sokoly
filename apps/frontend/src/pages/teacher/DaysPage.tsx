@@ -43,10 +43,11 @@ export function TeacherDaysPage() {
       .finally(() => setLoading(false));
   }, [selectedCohort, isAdmin]);
 
-  const handleOpen = async (day: DayRecord) => {
-    if (!confirm(`Открыть День ${day.day_number}? Курсанты сразу получат доступ к материалам.`)) return;
-    await daysApi.openDay(day.id);
-    setDays((prev) => prev.map((d) => d.id === day.id ? { ...d, status: DayStatus.OPEN } : d));
+  const handleToggle = async (day: DayRecord) => {
+    const action = day.status === DayStatus.OPEN ? 'закрыть' : 'открыть';
+    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} День ${day.day_number}?`)) return;
+    const r = await daysApi.toggleDay(day.id);
+    setDays((prev) => prev.map((d) => d.id === day.id ? { ...d, status: r.data.status } : d));
   };
 
   const grouped = days.reduce<Record<string, DayRecord[]>>((acc, d) => {
@@ -92,12 +93,16 @@ export function TeacherDaysPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {day.status === DayStatus.LOCKED && (
+                      {day.status !== DayStatus.ARCHIVED && (
                         <button
-                          onClick={() => handleOpen(day)}
-                          className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
+                          onClick={() => handleToggle(day)}
+                          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                            day.status === DayStatus.OPEN
+                              ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                              : 'bg-green-600 hover:bg-green-700 text-white'
+                          }`}
                         >
-                          Открыть день
+                          {day.status === DayStatus.OPEN ? 'Закрыть' : 'Открыть'}
                         </button>
                       )}
                       <Link
