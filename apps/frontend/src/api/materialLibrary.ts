@@ -24,7 +24,6 @@ export const materialLibraryApi = {
     form.append('title', title);
     if (folder) form.append('folder', folder);
     return client.post<LibraryItem>('/material-library', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         if (onProgress && e.total) onProgress(Math.round((e.loaded * 100) / e.total));
       },

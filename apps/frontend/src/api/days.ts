@@ -38,7 +38,6 @@ export const daysApi = {
     form.append('file', file);
     form.append('title', title);
     return client.post<MaterialRecord>(`/days/${dayId}/materials`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         if (onProgress && e.total) onProgress(Math.round((e.loaded * 100) / e.total));
       },
