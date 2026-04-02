@@ -9,10 +9,20 @@ function isChecked(sub: TestSubmission) {
   return sub.manual_score != null || sub.auto_score != null;
 }
 
-function finalScore(sub: TestSubmission) {
+function formatAutoScore(sub: TestSubmission, test: Test | null): string {
+  if (sub.auto_score == null) return '—';
+  const variant = test?.variants?.find((v) => v.id === sub.variant_id);
+  const questions = variant?.questions ?? [];
+  const allCount = questions.length;
+  const autoGradable = questions.filter((q) => q.type === 'SINGLE' || q.type === 'MULTIPLE').length;
+  if (!allCount || !autoGradable) return `${sub.auto_score.toFixed(1)}%`;
+  const correct = Math.round(sub.auto_score * allCount / 100);
+  return `${correct} из ${autoGradable}`;
+}
+
+function finalScore(sub: TestSubmission, test: Test | null = null): string {
   if (sub.manual_score != null) return sub.manual_score.toFixed(1);
-  if (sub.auto_score != null) return sub.auto_score.toFixed(1);
-  return '—';
+  return formatAutoScore(sub, test);
 }
 
 function isQuestionCorrect(ans: any, question: TestQuestion): boolean {
@@ -205,9 +215,9 @@ export function TeacherTestResultsPage() {
                         {sub.variant?.name ?? '—'}
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-slate-400">
-                        {sub.auto_score != null ? `${sub.auto_score.toFixed(1)}%` : '—'}
+                        {formatAutoScore(sub, test)}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-slate-100">{finalScore(sub)}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-slate-100">{finalScore(sub, test)}</td>
                       <td className="px-4 py-3">
                         {isChecked(sub)
                           ? <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">Проверен</span>
@@ -258,7 +268,7 @@ export function TeacherTestResultsPage() {
                     </span>
                   )}
                   <span className="text-xs text-gray-500 dark:text-slate-400">
-                    Итог: <strong className="text-gray-900 dark:text-slate-100">{finalScore(selected)}</strong>
+                    Итог: <strong className="text-gray-900 dark:text-slate-100">{finalScore(selected, test)}</strong>
                   </span>
                 </div>
 

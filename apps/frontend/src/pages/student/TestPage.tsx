@@ -100,8 +100,16 @@ export function StudentTestPage() {
           {result.show_result && result.auto_score != null ? (
             <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 space-y-4">
               <div className="text-center">
-                <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">{result.auto_score.toFixed(0)}%</div>
-                <p className="text-gray-500 dark:text-slate-400 mt-2">правильных ответов</p>
+                {(() => {
+                  const autoQs = result.questions?.filter(q => q.type === 'SINGLE' || q.type === 'MULTIPLE') ?? [];
+                  const correct = result.answers_detail?.filter(a => a.is_correct === true).length ?? 0;
+                  return (
+                    <>
+                      <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">{correct} из {autoQs.length}</div>
+                      <p className="text-gray-500 dark:text-slate-400 mt-2">правильных ответов</p>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="space-y-3 mt-4">
