@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Layout } from '../../components/Layout';
-import { testsApi, CohortStudent } from '../../api/tests';
+import { testsApi, CohortStudent, ParsedQuestion } from '../../api/tests';
 import { cohortsApi, Cohort } from '../../api/cohorts';
 
 type QuestionType = 'SINGLE' | 'MULTIPLE' | 'OPEN_TEXT' | 'DRAWING';
@@ -247,6 +247,9 @@ export function TestCreatePage() {
   const [cohortStudents, setCohortStudents] = useState<CohortStudent[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string>('');
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -339,6 +342,29 @@ export function TestCreatePage() {
       if (v.student_ids.includes(studentId)) return v.localId;
     }
     return null;
+  };
+
+  const handleImportDocx = async (file: File) => {
+    setImporting(true);
+    setImportResult('');
+    try {
+      const r = await testsApi.importDocx(file);
+      const imported: QuestionForm[] = r.data.questions.map((q: ParsedQuestion) => ({
+        localId: makeId(),
+        type: q.type as QuestionType,
+        question_text: q.question_text,
+        answers: q.answers.map((a) => ({ localId: makeId(), answer_text: a.answer_text, is_correct: a.is_correct })),
+      }));
+      updateVariant(activeVariant.localId, {
+        questions: [...activeVariant.questions, ...imported],
+      });
+      setImportResult(`Импортировано вопросов: ${imported.length}`);
+    } catch (e: any) {
+      setImportResult(`Ошибка: ${e.response?.data?.error ?? 'не удалось разобрать файл'}`);
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
   };
 
   const handleSave = async () => {
@@ -556,7 +582,26 @@ export function TestCreatePage() {
                       {typeLabel(t)}
                     </button>
                   ))}
+                  <button
+                    onClick={() => importInputRef.current?.click()}
+                    disabled={importing}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50"
+                  >
+                    {importing ? 'Импорт...' : '📥 Импорт из Word'}
+                  </button>
+                  <input
+                    ref={importInputRef}
+                    type="file"
+                    accept=".docx"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportDocx(f); }}
+                  />
                 </div>
+                {importResult && (
+                  <p className={`mt-2 text-xs ${importResult.startsWith('Ошибка') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                    {importResult}
+                  </p>
+                )}
               </div>
 
               {/* Student assignment */}

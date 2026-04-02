@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserRole, QuestionType } from '@prisma/client';
 import { prisma } from '../../db';
 import { authGuard, roleGuard } from '../../middleware/authGuard';
+import { parseDocxBuffer } from '../../services/docxParser';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
@@ -67,6 +68,33 @@ export async function testsRoutes(app: FastifyInstance) {
     } catch {
       return reply.status(404).send({ error: 'Not Found' });
     }
+  });
+
+  // POST /api/tests/parse-docx — parse Word file into questions array (does not save)
+  app.post('/parse-docx', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const data = await request.file({ limits: { fileSize: 20 * 1024 * 1024 } });
+    if (!data) return reply.status(400).send({ error: 'No file provided' });
+
+    const ext = path.extname(data.filename).toLowerCase();
+    if (ext !== '.docx') return reply.status(400).send({ error: 'Only .docx files are supported' });
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of data.file) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const buffer = Buffer.concat(chunks);
+
+    const questions = await parseDocxBuffer(buffer);
+
+    if (questions.length === 0) {
+      return reply.status(400).send({
+        error: 'No questions found. Make sure the file matches the template format.',
+      });
+    }
+
+    return { questions };
   });
 
   // GET /api/tests/cohort-students/:cohortId — list students in cohort (for variant assignment)

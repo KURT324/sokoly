@@ -81,6 +81,13 @@ export interface SubmitResult {
   questions?: Array<{ id: string; question_text: string; type: QuestionType; correct_answer_ids?: string[] }>;
 }
 
+export interface ParsedQuestion {
+  type: QuestionType;
+  question_text: string;
+  order_index: number;
+  answers: Array<{ answer_text: string; is_correct: boolean }>;
+}
+
 export const testsApi = {
   uploadImage: (file: File) => {
     const form = new FormData();
@@ -111,4 +118,10 @@ export const testsApi = {
 
   updateScore: (testId: string, subId: string, manual_score: number) =>
     client.patch<TestSubmission>(`/tests/${testId}/submissions/${subId}/score`, { manual_score }),
+
+  importDocx: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return client.post<{ questions: ParsedQuestion[] }>('/tests/parse-docx', form);
+  },
 };
