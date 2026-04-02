@@ -25,6 +25,7 @@ import { AdminChatPage } from './pages/chat/AdminChatPage';
 import { TeacherAnalyticsPage } from './pages/teacher/AnalyticsPage';
 import { AdminAnalyticsPage } from './pages/admin/AnalyticsPage';
 import { MaterialLibraryPage } from './pages/teacher/MaterialLibraryPage';
+import { TeacherStudentsPage } from './pages/teacher/StudentsPage';
 
 const queryClient = new QueryClient();
 
@@ -86,6 +87,11 @@ export default function App() {
           {/* Teacher: material library */}
           <Route path="/teacher/library" element={
             <PrivateRoute allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><MaterialLibraryPage /></PrivateRoute>
+          } />
+
+          {/* Teacher: students roster */}
+          <Route path="/teacher/students" element={
+            <PrivateRoute allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><TeacherStudentsPage /></PrivateRoute>
           } />
 
           {/* Student */}
