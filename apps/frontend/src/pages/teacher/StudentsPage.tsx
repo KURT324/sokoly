@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { studentsApi, StudentsRoster } from '../../api/students';
 import type { StudentRow } from '../../api/students';
-import { adminApi, CohortRecord } from '../../api/admin';
+import { cohortsApi, Cohort } from '../../api/cohorts';
 import { Layout } from '../../components/Layout';
 
 function formatLastLogin(dateStr: string | null): string {
@@ -38,7 +38,7 @@ export function TeacherStudentsPage() {
   const user = useAuthStore((s) => s.user);
   const teacherCohortId = user?.cohort_id ?? null;
 
-  const [cohorts, setCohorts] = useState<CohortRecord[]>([]);
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedCohortId, setSelectedCohortId] = useState<string>('');
   const [roster, setRoster] = useState<StudentsRoster | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,7 +47,7 @@ export function TeacherStudentsPage() {
   // For admin / teacher without cohort_id — load cohort list
   useEffect(() => {
     if (!teacherCohortId) {
-      adminApi.getCohorts().then((r) => {
+      cohortsApi.getCohorts().then((r) => {
         setCohorts(r.data);
         if (r.data.length > 0) setSelectedCohortId(r.data[0].id);
       });

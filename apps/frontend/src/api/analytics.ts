@@ -7,7 +7,7 @@ export interface TestAnalyticsRow {
 }
 
 export interface TestAnalytics {
-  tests: Array<{ id: string; title: string; created_at: string }>;
+  tests: Array<{ id: string; title: string; created_at: string; questionCount: number | null }>;
   rows: TestAnalyticsRow[];
   columnAverages: Record<string, number | null>;
 }

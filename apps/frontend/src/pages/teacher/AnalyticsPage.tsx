@@ -12,9 +12,13 @@ function scoreColor(score: number | null | 'pending'): string {
   return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
 }
 
-function scoreLabel(score: number | null | 'pending'): string {
+function scoreLabel(score: number | null | 'pending', questionCount?: number | null): string {
   if (score === null) return '—';
   if (score === 'pending') return '⏳';
+  if (questionCount != null && questionCount > 0) {
+    const correct = Math.round((score / 100) * questionCount);
+    return `${correct} из ${questionCount}`;
+  }
   return `${score.toFixed(0)}%`;
 }
 
@@ -96,7 +100,7 @@ export function TeacherAnalyticsPage() {
                         return (
                           <td key={t.id} className="px-3 py-2 text-center">
                             <span className={`text-xs px-2 py-0.5 rounded ${scoreColor(score)}`}>
-                              {scoreLabel(score)}
+                              {scoreLabel(score, t.questionCount)}
                             </span>
                           </td>
                         );
@@ -116,7 +120,7 @@ export function TeacherAnalyticsPage() {
                       return (
                         <td key={t.id} className="px-3 py-2 text-center">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded ${scoreColor(avg)}`}>
-                            {avg != null ? `${avg.toFixed(0)}%` : '—'}
+                            {scoreLabel(avg, t.questionCount)}
                           </span>
                         </td>
                       );

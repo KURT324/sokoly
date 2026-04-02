@@ -12,7 +12,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
   app.get('/cohorts/:id/tests', teacherOrAdmin, async (request, reply) => {
     const { id } = request.params as { id: string };
 
-    const [students, tests, submissions] = await Promise.all([
+    const [students, testsRaw, submissions] = await Promise.all([
       prisma.user.findMany({
         where: { cohort_id: id, role: UserRole.STUDENT, is_active: true },
         select: { id: true, callsign: true, email: true },
@@ -20,7 +20,10 @@ export async function analyticsRoutes(app: FastifyInstance) {
       }),
       prisma.test.findMany({
         where: { cohort_id: id },
-        select: { id: true, title: true, created_at: true },
+        select: {
+          id: true, title: true, created_at: true,
+          variants: { select: { _count: { select: { questions: true } } }, take: 1 },
+        },
         orderBy: { created_at: 'asc' },
       }),
       prisma.testSubmission.findMany({
@@ -28,6 +31,13 @@ export async function analyticsRoutes(app: FastifyInstance) {
         select: { student_id: true, test_id: true, auto_score: true, manual_score: true },
       }),
     ]);
+
+    const tests = testsRaw.map((t) => ({
+      id: t.id,
+      title: t.title,
+      created_at: t.created_at,
+      questionCount: t.variants[0]?._count.questions ?? null,
+    }));
 
     const rows = students.map((student) => {
       const scores: Record<string, number | null | 'pending'> = {};
