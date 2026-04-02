@@ -4,6 +4,18 @@ import { Layout } from '../../components/Layout';
 import { analyticsApi, TestAnalytics, CardAnalyticsRow } from '../../api/analytics';
 import { cohortsApi, Cohort } from '../../api/cohorts';
 
+const CARD_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Ожидает',
+  AWAITING_REVIEW: 'На проверке',
+  RETURNED: 'Возвращено',
+  COMPLETED: 'Выполнено',
+};
+
+function cardStatusLabel(status: string | null): string {
+  if (!status) return '—';
+  return CARD_STATUS_LABELS[status] ?? status;
+}
+
 function scoreColor(score: number | null | 'pending'): string {
   if (score === null) return '';
   if (score === 'pending') return 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500';
@@ -172,7 +184,7 @@ export function TeacherAnalyticsPage() {
                           row.lastStatus === 'RETURNED' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' :
                           'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'
                         }`}>
-                          {row.lastStatus ?? '—'}
+                          {cardStatusLabel(row.lastStatus)}
                         </span>
                       </td>
                     </tr>
@@ -211,7 +223,7 @@ export function TeacherAnalyticsPage() {
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     r.lastStatus === 'AWAITING_REVIEW' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                   }`}>
-                    {r.lastStatus}
+                    {cardStatusLabel(r.lastStatus)}
                   </span>
                 </div>
               ))}
