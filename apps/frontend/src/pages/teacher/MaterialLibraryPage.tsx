@@ -36,6 +36,24 @@ export function MaterialLibraryPage() {
   const load = () =>
     materialLibraryApi.getLibrary().then((r) => setItems(r.data)).finally(() => setLoading(false));
 
+  // Inline preview state
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [docHtmlCache, setDocHtmlCache] = useState<Record<string, string>>({});
+
+  const handlePreview = (item: LibraryItem) => {
+    if (item.type === MaterialType.LINK) {
+      window.open(item.url!, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setPreviewId((prev) => (prev === item.id ? null : item.id));
+    if (item.type === MaterialType.DOC && item.storage_path && !docHtmlCache[item.storage_path]) {
+      fetch(`/api/materials/file/${item.storage_path}/html`)
+        .then((r) => r.text())
+        .then((html) => setDocHtmlCache((prev) => ({ ...prev, [item.storage_path!]: html })))
+        .catch(() => {});
+    }
+  };
+
   useEffect(() => { load(); }, []);
 
   // Collect all unique folder names for autocomplete suggestions
@@ -240,40 +258,100 @@ export function MaterialLibraryPage() {
                   <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">{groupItems.length}</span>
                 </div>
                 <div className="divide-y divide-gray-100 dark:divide-slate-700">
-                  {groupItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between px-4 py-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xl shrink-0">{TYPE_ICONS[item.type]}</span>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{item.title}</div>
-                          {item.size_bytes && (
-                            <div className="text-xs text-gray-400 dark:text-slate-500">{formatBytes(item.size_bytes)}</div>
-                          )}
-                          {item.url && (
-                            <div className="text-xs text-gray-400 dark:text-slate-500 truncate">{item.url}</div>
-                          )}
+                  {groupItems.map((item) => {
+                    const isOpen = previewId === item.id;
+                    return (
+                      <div key={item.id} className="overflow-hidden">
+                        <div className={`flex items-center justify-between px-4 py-3 ${isOpen ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-xl shrink-0">{TYPE_ICONS[item.type]}</span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{item.title}</div>
+                              {item.size_bytes && (
+                                <div className="text-xs text-gray-400 dark:text-slate-500">{formatBytes(item.size_bytes)}</div>
+                              )}
+                              {item.url && (
+                                <div className="text-xs text-gray-400 dark:text-slate-500 truncate">{item.url}</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 ml-4 shrink-0">
+                            {item.type === MaterialType.LINK ? (
+                              <a
+                                href={item.url!}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                Открыть →
+                              </a>
+                            ) : item.storage_path && (
+                              <button
+                                onClick={() => handlePreview(item)}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                              >
+                                {isOpen ? 'Свернуть ↑' : 'Открыть ↓'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(item)}
+                              className="text-xs text-red-500 hover:text-red-700"
+                            >
+                              Удалить
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4 shrink-0">
-                        {item.type !== MaterialType.LINK && item.storage_path && (
-                          <a
-                            href={materialLibraryApi.getViewUrl(item.id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            Просмотр
-                          </a>
+
+                        {isOpen && item.storage_path && (
+                          <div className="bg-gray-50 dark:bg-slate-900/50">
+                            {item.type === MaterialType.PDF && (
+                              <iframe
+                                src={`/api/materials/file/${item.storage_path}`}
+                                title={item.title}
+                                className="w-full border-0"
+                                style={{ height: '80vh' }}
+                              />
+                            )}
+                            {item.type === MaterialType.DOC && (
+                              <div className="p-6 overflow-auto" style={{ maxHeight: '80vh' }}>
+                                {docHtmlCache[item.storage_path] ? (
+                                  <div
+                                    className="prose prose-sm dark:prose-invert max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: docHtmlCache[item.storage_path] }}
+                                  />
+                                ) : (
+                                  <div className="text-center text-gray-400 dark:text-slate-500 py-8">Загрузка документа...</div>
+                                )}
+                              </div>
+                            )}
+                            {item.type === MaterialType.VIDEO && (
+                              <div className="p-4">
+                                <video
+                                  src={`/api/materials/file/${item.storage_path}`}
+                                  controls
+                                  controlsList="nodownload"
+                                  disablePictureInPicture
+                                  onContextMenu={(e) => e.preventDefault()}
+                                  className="w-full rounded-lg"
+                                  style={{ maxHeight: '70vh' }}
+                                />
+                              </div>
+                            )}
+                            {item.type === MaterialType.IMAGE && (
+                              <div className="p-4 flex justify-center">
+                                <img
+                                  src={materialLibraryApi.getViewUrl(item.id)}
+                                  alt={item.title}
+                                  className="max-w-full rounded-lg"
+                                  style={{ maxHeight: '70vh' }}
+                                />
+                              </div>
+                            )}
+                          </div>
                         )}
-                        <button
-                          onClick={() => handleDelete(item)}
-                          className="text-xs text-red-500 hover:text-red-700"
-                        >
-                          Удалить
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}

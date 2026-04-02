@@ -34,6 +34,24 @@ export function TeacherDayDetailPage() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
 
+  // Inline preview
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [docHtmlCache, setDocHtmlCache] = useState<Record<string, string>>({});
+
+  const handlePreview = (m: MaterialRecord) => {
+    if (m.type === MaterialType.LINK) {
+      window.open(m.url!, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setPreviewId((prev) => (prev === m.id ? null : m.id));
+    if (m.type === MaterialType.DOC && m.storage_path && !docHtmlCache[m.storage_path]) {
+      fetch(`/api/materials/file/${m.storage_path}/html`)
+        .then((r) => r.text())
+        .then((html) => setDocHtmlCache((prev) => ({ ...prev, [m.storage_path!]: html })))
+        .catch(() => {});
+    }
+  };
+
   // Library modal
   const [showLibrary, setShowLibrary] = useState(false);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
@@ -275,28 +293,101 @@ export function TeacherDayDetailPage() {
             <div className="px-4 py-8 text-center text-gray-400 dark:text-slate-500 text-sm">Материалы не загружены</div>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-slate-700">
-              {materials.map((m) => (
-                <div key={m.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xl shrink-0">{TYPE_ICONS[m.type]}</span>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{m.title}</div>
-                      {m.size_bytes && (
-                        <div className="text-xs text-gray-400 dark:text-slate-500">{formatBytes(m.size_bytes)}</div>
-                      )}
-                      {m.url && (
-                        <div className="text-xs text-gray-400 dark:text-slate-500 truncate">{m.url}</div>
-                      )}
+              {materials.map((m) => {
+                const isOpen = previewId === m.id;
+                const canPreview = m.type !== MaterialType.LINK && m.storage_path;
+                return (
+                  <div key={m.id} className="overflow-hidden">
+                    <div className={`flex items-center justify-between px-4 py-3 ${isOpen ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xl shrink-0">{TYPE_ICONS[m.type]}</span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">{m.title}</div>
+                          {m.size_bytes && (
+                            <div className="text-xs text-gray-400 dark:text-slate-500">{formatBytes(m.size_bytes)}</div>
+                          )}
+                          {m.url && (
+                            <div className="text-xs text-gray-400 dark:text-slate-500 truncate">{m.url}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 ml-4 shrink-0">
+                        {m.type === MaterialType.LINK ? (
+                          <a
+                            href={m.url!}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            Открыть →
+                          </a>
+                        ) : canPreview && (
+                          <button
+                            onClick={() => handlePreview(m)}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            {isOpen ? 'Свернуть ↑' : 'Открыть ↓'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(m.id, m.title)}
+                          className="text-xs text-red-500 hover:text-red-700"
+                        >
+                          Удалить
+                        </button>
+                      </div>
                     </div>
+
+                    {isOpen && m.storage_path && (
+                      <div className="bg-gray-50 dark:bg-slate-900/50">
+                        {m.type === MaterialType.PDF && (
+                          <iframe
+                            src={`/api/materials/view/${m.id}`}
+                            title={m.title}
+                            className="w-full border-0"
+                            style={{ height: '80vh' }}
+                          />
+                        )}
+                        {m.type === MaterialType.DOC && (
+                          <div className="p-6 overflow-auto" style={{ maxHeight: '80vh' }}>
+                            {docHtmlCache[m.storage_path] ? (
+                              <div
+                                className="prose prose-sm dark:prose-invert max-w-none"
+                                dangerouslySetInnerHTML={{ __html: docHtmlCache[m.storage_path] }}
+                              />
+                            ) : (
+                              <div className="text-center text-gray-400 dark:text-slate-500 py-8">Загрузка документа...</div>
+                            )}
+                          </div>
+                        )}
+                        {m.type === MaterialType.VIDEO && (
+                          <div className="p-4">
+                            <video
+                              src={`/api/materials/view/${m.id}`}
+                              controls
+                              controlsList="nodownload"
+                              disablePictureInPicture
+                              onContextMenu={(e) => e.preventDefault()}
+                              className="w-full rounded-lg"
+                              style={{ maxHeight: '70vh' }}
+                            />
+                          </div>
+                        )}
+                        {m.type === MaterialType.IMAGE && (
+                          <div className="p-4 flex justify-center">
+                            <img
+                              src={daysApi.getMaterialViewUrl(dayId!, m.id)}
+                              alt={m.title}
+                              className="max-w-full rounded-lg"
+                              style={{ maxHeight: '70vh' }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => handleDelete(m.id, m.title)}
-                    className="text-xs text-red-500 hover:text-red-700 ml-4 shrink-0"
-                  >
-                    Удалить
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
