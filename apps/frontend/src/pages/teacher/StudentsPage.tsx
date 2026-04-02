@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { studentsApi, StudentRow, StudentsRoster } from '../../api/students';
+import { studentsApi, StudentsRoster } from '../../api/students';
+import type { StudentRow } from '../../api/students';
 import { adminApi, CohortRecord } from '../../api/admin';
 import { Layout } from '../../components/Layout';
 
@@ -35,7 +36,6 @@ function StatBadge({ value, total, label }: { value: number; total: number; labe
 
 export function TeacherStudentsPage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'ADMIN';
   const teacherCohortId = user?.cohort_id ?? null;
 
   const [cohorts, setCohorts] = useState<CohortRecord[]>([]);
