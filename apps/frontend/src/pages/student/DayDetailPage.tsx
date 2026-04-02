@@ -22,9 +22,6 @@ const TYPE_LABELS: Record<MaterialType, string> = {
   [MaterialType.VIDEO]: 'Видео',
 };
 
-function publicFileUrl(storagePath: string): string {
-  return `/api/materials/file/${storagePath}`;
-}
 
 export function StudentDayDetailPage() {
   const { dayId } = useParams<{ dayId: string }>();
@@ -142,7 +139,7 @@ export function StudentDayDetailPage() {
                     <div className="bg-gray-50 dark:bg-slate-900/50">
                       {m.type === MaterialType.PDF && (
                         <iframe
-                          src={publicFileUrl(m.storage_path)}
+                          src={`/api/materials/view/${m.id}`}
                           title={m.title}
                           className="w-full border-0"
                           style={{ height: '80vh' }}
@@ -165,7 +162,7 @@ export function StudentDayDetailPage() {
                       {m.type === MaterialType.VIDEO && (
                         <div className="p-4">
                           <video
-                            src={publicFileUrl(m.storage_path)}
+                            src={`/api/materials/view/${m.id}`}
                             controls
                             controlsList="nodownload"
                             disablePictureInPicture
