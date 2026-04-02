@@ -26,13 +26,6 @@ function publicFileUrl(storagePath: string): string {
   return `/api/materials/file/${storagePath}`;
 }
 
-function googleDocsViewerUrl(storagePath: string): string {
-  const fileUrl = encodeURIComponent(
-    `${window.location.origin}/api/materials/file/${storagePath}`,
-  );
-  return `https://docs.google.com/gviewer?url=${fileUrl}&embedded=true`;
-}
-
 export function StudentDayDetailPage() {
   const { dayId } = useParams<{ dayId: string }>();
   const navigate = useNavigate();
@@ -42,6 +35,8 @@ export function StudentDayDetailPage() {
   const [selected, setSelected] = useState<MaterialRecord | null>(null);
   // ProtectedViewer for IMAGE (watermark)
   const [imageViewer, setImageViewer] = useState<{ url: string; title: string } | null>(null);
+  // Cache of converted docx HTML keyed by storage_path
+  const [docHtmlCache, setDocHtmlCache] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!dayId) return;
@@ -73,6 +68,14 @@ export function StudentDayDetailPage() {
     // PDF / DOC / VIDEO — toggle inline viewer
     setSelected((prev) => (prev?.id === material.id ? null : material));
     setImageViewer(null);
+
+    // Preload docx HTML if not cached
+    if (material.type === MaterialType.DOC && material.storage_path && !docHtmlCache[material.storage_path]) {
+      fetch(`/api/materials/file/${material.storage_path}/html`)
+        .then((r) => r.text())
+        .then((html) => setDocHtmlCache((prev) => ({ ...prev, [material.storage_path!]: html })))
+        .catch(() => {});
+    }
   };
 
   if (!day) return (
@@ -147,13 +150,16 @@ export function StudentDayDetailPage() {
                       )}
 
                       {m.type === MaterialType.DOC && (
-                        <iframe
-                          src={googleDocsViewerUrl(m.storage_path)}
-                          title={m.title}
-                          className="w-full border-0"
-                          style={{ height: '80vh' }}
-                          sandbox="allow-scripts allow-same-origin allow-popups"
-                        />
+                        <div className="p-6 overflow-auto" style={{ maxHeight: '80vh' }}>
+                          {docHtmlCache[m.storage_path] ? (
+                            <div
+                              className="prose prose-sm dark:prose-invert max-w-none"
+                              dangerouslySetInnerHTML={{ __html: docHtmlCache[m.storage_path] }}
+                            />
+                          ) : (
+                            <div className="text-center text-gray-400 dark:text-slate-500 py-8">Загрузка документа...</div>
+                          )}
+                        </div>
                       )}
 
                       {m.type === MaterialType.VIDEO && (

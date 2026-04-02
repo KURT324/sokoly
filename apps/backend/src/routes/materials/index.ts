@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
+import mammoth from 'mammoth';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
@@ -74,5 +75,30 @@ export async function materialsPublicRoutes(app: FastifyInstance) {
       .header('Content-Disposition', 'inline')
       .header('Cache-Control', 'no-store')
       .send(buf);
+  });
+
+  // GET /api/materials/file/:filename/html — convert .docx to HTML via mammoth
+  app.get('/file/:filename/html', async (request, reply) => {
+    const raw = (request.params as { filename: string }).filename;
+    const filename = path.basename(raw);
+    const ext = path.extname(filename).toLowerCase();
+
+    if (ext !== '.docx' && ext !== '.doc') {
+      return reply.status(400).send({ error: 'Only .doc/.docx supported' });
+    }
+
+    const filePath = path.join(STORAGE_PATH, filename);
+    try {
+      await fs.access(filePath);
+    } catch {
+      return reply.status(404).send({ error: 'Not Found' });
+    }
+
+    const buf = await fs.readFile(filePath);
+    const result = await mammoth.convertToHtml({ buffer: buf });
+    return reply
+      .header('Content-Type', 'text/html; charset=utf-8')
+      .header('Cache-Control', 'no-store')
+      .send(result.value);
   });
 }
