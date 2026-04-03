@@ -10,6 +10,7 @@
 
   body {
     @apply font-sans text-[#111827] bg-white dark:text-slate-100 dark:bg-slate-950;
+    overflow-x: hidden;
   }
 
   * {

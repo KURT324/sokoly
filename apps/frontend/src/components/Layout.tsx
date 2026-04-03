@@ -468,8 +468,8 @@ export function Layout({ children }: LayoutProps) {
       </header>
 
       {/* ── Main content ─────────────────────────────────────────────────── */}
-      <div className="flex-1 md:ml-60 min-h-screen bg-[#fafafa] dark:bg-slate-950">
-        <main className="pt-14 md:pt-0 px-4 py-4 md:px-8 md:py-8">
+      <div className="flex-1 md:ml-60 min-h-screen bg-[#fafafa] dark:bg-slate-950 overflow-x-hidden">
+        <main className="pt-14 md:pt-0 px-4 py-4 md:px-8 md:py-8 overflow-x-hidden">
           {children}
         </main>
       </div>

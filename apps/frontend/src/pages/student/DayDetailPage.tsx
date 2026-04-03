@@ -147,10 +147,14 @@ export function StudentDayDetailPage() {
                       )}
 
                       {m.type === MaterialType.DOC && (
-                        <div className="p-6 overflow-auto" style={{ maxHeight: '80vh' }}>
+                        <div className="p-4 md:p-6 overflow-auto" style={{ maxHeight: '80vh', overflowX: 'hidden', maxWidth: '100%', wordBreak: 'break-word' }}>
+                          <style>{`
+                            .docx-content img { max-width: 100% !important; height: auto !important; }
+                            .docx-content table { max-width: 100% !important; overflow-x: auto; display: block; }
+                          `}</style>
                           {docHtmlCache[m.storage_path] ? (
                             <div
-                              className="prose prose-sm dark:prose-invert max-w-none"
+                              className="docx-content prose prose-sm dark:prose-invert max-w-none"
                               dangerouslySetInnerHTML={{ __html: docHtmlCache[m.storage_path] }}
                             />
                           ) : (
