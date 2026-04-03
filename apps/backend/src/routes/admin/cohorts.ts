@@ -70,27 +70,35 @@ export async function adminCohortsRoutes(app: FastifyInstance) {
     const cohort = await prisma.cohort.findUnique({ where: { id } });
     if (!cohort) return reply.status(404).send({ error: 'Not Found' });
 
+    // Collect student IDs upfront — needed for student-keyed FK deletes
+    const students = await prisma.user.findMany({
+      where: { cohort_id: id, role: 'STUDENT' },
+      select: { id: true },
+    });
+    const studentIds = students.map((s) => s.id);
+
     // Delete in order to respect FK constraints:
-    // 1. Chat messages
+    // 1. Chat messages (by cohort chats)
     await prisma.chatMessage.deleteMany({ where: { chat: { cohort_id: id } } });
     // 2. Chats
     await prisma.chat.deleteMany({ where: { cohort_id: id } });
-    // 3. Card attempts → card tasks
-    const days = await prisma.day.findMany({ where: { cohort_id: id }, select: { id: true } });
-    const dayIds = days.map((d) => d.id);
-    await prisma.cardAttempt.deleteMany({ where: { task: { day_id: { in: dayIds } } } });
-    await prisma.cardTask.deleteMany({ where: { day_id: { in: dayIds } } });
-    // 4. Test submissions → tests
-    await prisma.testSubmission.deleteMany({ where: { test: { cohort_id: id } } });
+    // 3. CardAttempt → CardTask by student_id (day_id is optional — can't filter by day alone)
+    await prisma.cardAttempt.deleteMany({ where: { task: { student_id: { in: studentIds } } } });
+    await prisma.cardTask.deleteMany({ where: { student_id: { in: studentIds } } });
+    // 4. TestVariantAssignment by student_id
+    await prisma.testVariantAssignment.deleteMany({ where: { student_id: { in: studentIds } } });
+    // 5. TestSubmission by student_id
+    await prisma.testSubmission.deleteMany({ where: { student_id: { in: studentIds } } });
+    // 6. Test structure (answers → questions → variants → tests)
     await prisma.testAnswer.deleteMany({ where: { question: { variant: { test: { cohort_id: id } } } } });
     await prisma.testQuestion.deleteMany({ where: { variant: { test: { cohort_id: id } } } });
     await prisma.test.deleteMany({ where: { cohort_id: id } });
-    // 5. Materials → days
+    // 7. Materials → days
     await prisma.material.deleteMany({ where: { day: { cohort_id: id } } });
     await prisma.day.deleteMany({ where: { cohort_id: id } });
-    // 6. Students
+    // 8. Students
     await prisma.user.deleteMany({ where: { cohort_id: id, role: 'STUDENT' } });
-    // 7. Cohort
+    // 9. Cohort
     await prisma.cohort.delete({ where: { id } });
 
     return { success: true };
