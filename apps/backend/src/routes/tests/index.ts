@@ -175,6 +175,21 @@ export async function testsRoutes(app: FastifyInstance) {
     return reply.status(201).send(test);
   });
 
+  // PATCH /api/tests/:id/toggle-open — teacher: toggle is_open
+  app.patch('/:id/toggle-open', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const test = await prisma.test.findUnique({ where: { id }, select: { is_open: true } });
+    if (!test) return reply.status(404).send({ error: 'Not Found' });
+    const updated = await prisma.test.update({
+      where: { id },
+      data: { is_open: !test.is_open },
+      select: { id: true, is_open: true },
+    });
+    return updated;
+  });
+
   // GET /api/tests — list
   app.get('/', { preHandler: authGuard }, async (request, reply) => {
     const user = request.user!;
@@ -182,7 +197,7 @@ export async function testsRoutes(app: FastifyInstance) {
     if (user.role === UserRole.STUDENT) {
       if (!user.cohort_id) return reply.status(400).send({ error: 'No cohort' });
       const tests = await prisma.test.findMany({
-        where: { cohort_id: user.cohort_id },
+        where: { cohort_id: user.cohort_id, is_open: true },
         include: {
           _count: { select: { submissions: true } },
           submissions: {

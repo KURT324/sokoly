@@ -149,6 +149,7 @@ model Test {
   cohort_id               String
   time_limit_min          Int?
   show_result_immediately Boolean  @default(true)
+  is_open                 Boolean  @default(false)
   created_by_id           String
   created_at              DateTime @default(now())
 

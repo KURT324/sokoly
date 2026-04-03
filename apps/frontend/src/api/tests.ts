@@ -39,6 +39,7 @@ export interface Test {
   cohort_id: string;
   time_limit_min?: number | null;
   show_result_immediately: boolean;
+  is_open: boolean;
   created_at: string;
   variants: TestVariant[];
   _count?: { submissions: number };
@@ -109,6 +110,7 @@ export const testsApi = {
   createTest: (data: any) => client.post<Test>('/tests', data),
   updateTest: (id: string, data: any) => client.put<Test>(`/tests/${id}`, data),
   deleteTest: (id: string) => client.delete(`/tests/${id}`),
+  toggleOpen: (id: string) => client.patch<{ id: string; is_open: boolean }>(`/tests/${id}/toggle-open`),
 
   submitTest: (id: string, answers: any[], variant_id: string) =>
     client.post<SubmitResult>(`/tests/${id}/submit`, { answers, variant_id }),

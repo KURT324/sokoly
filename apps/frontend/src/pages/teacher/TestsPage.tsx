@@ -18,6 +18,11 @@ export function TeacherTestsPage() {
     setTests((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const handleToggleOpen = async (id: string) => {
+    const r = await testsApi.toggleOpen(id);
+    setTests((prev) => prev.map((t) => t.id === id ? { ...t, is_open: r.data.is_open } : t));
+  };
+
   return (
     <Layout>
       <div className="max-w-5xl mx-auto">
@@ -44,6 +49,7 @@ export function TeacherTestsPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Группа</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">День</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Прошли</th>
+                  <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Доступ</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Действия</th>
                 </tr>
               </thead>
@@ -56,6 +62,19 @@ export function TeacherTestsPage() {
                       {test.day ? `День ${test.day.day_number}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-500 dark:text-slate-400">{test._count?.submissions ?? 0}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleToggleOpen(test.id)}
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+                          test.is_open
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${test.is_open ? 'bg-green-500' : 'bg-gray-400'}`} />
+                        {test.is_open ? 'Открыт' : 'Закрыт'}
+                      </button>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Link
