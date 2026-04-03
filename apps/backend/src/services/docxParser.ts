@@ -15,6 +15,8 @@ export interface ParsedQuestion {
 export async function parseDocxBuffer(buffer: Buffer): Promise<ParsedQuestion[]> {
   const { value: rawText } = await mammoth.extractRawText({ buffer });
 
+  console.log('[parse-docx] raw text from mammoth:\n---\n' + rawText + '\n---');
+
   const lines = rawText
     .split('\n')
     .map((l) => l.trim())
