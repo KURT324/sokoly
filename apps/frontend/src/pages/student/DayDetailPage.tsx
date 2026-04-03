@@ -138,12 +138,28 @@ export function StudentDayDetailPage() {
                   {isOpen && m.storage_path && (
                     <div className="bg-gray-50 dark:bg-slate-900/50">
                       {m.type === MaterialType.PDF && (
-                        <iframe
-                          src={`/api/materials/view/${m.id}`}
-                          title={m.title}
-                          className="w-full border-0"
-                          style={{ height: '90svh', minHeight: '500px' }}
-                        />
+                        <>
+                          {/* Mobile: open in new tab (iframes don't scroll on mobile browsers) */}
+                          <div className="md:hidden p-6 flex flex-col items-center gap-3">
+                            <span className="text-4xl">📄</span>
+                            <p className="text-sm text-gray-600 dark:text-slate-400 text-center">{m.title}</p>
+                            <a
+                              href={`/api/materials/view/${m.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
+                            >
+                              Открыть PDF
+                            </a>
+                          </div>
+                          {/* Desktop: inline iframe */}
+                          <iframe
+                            src={`/api/materials/view/${m.id}`}
+                            title={m.title}
+                            className="hidden md:block w-full border-0"
+                            style={{ height: '80vh' }}
+                          />
+                        </>
                       )}
 
                       {m.type === MaterialType.DOC && (
