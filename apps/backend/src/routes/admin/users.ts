@@ -144,7 +144,23 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return reply.status(404).send({ error: 'Not Found' });
 
-    await prisma.user.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      // 1. CardAttempt (references CardTask, no cascade)
+      await tx.cardAttempt.deleteMany({
+        where: { task: { student_id: id } },
+      });
+      // 2. CardTask (student_id FK, no cascade)
+      await tx.cardTask.deleteMany({ where: { student_id: id } });
+      // 3. TestSubmission (student_id FK, no cascade)
+      await tx.testSubmission.deleteMany({ where: { student_id: id } });
+      // 4. ChatMessage (sender_id FK, no cascade)
+      await tx.chatMessage.deleteMany({ where: { sender_id: id } });
+      // 5. TestVariantAssignment (has onDelete: Cascade but be explicit)
+      await tx.testVariantAssignment.deleteMany({ where: { student_id: id } });
+      // 6. User
+      await tx.user.delete({ where: { id } });
+    });
+
     return { success: true };
   });
 }
