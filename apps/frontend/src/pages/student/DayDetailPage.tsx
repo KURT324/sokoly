@@ -142,7 +142,7 @@ export function StudentDayDetailPage() {
                           src={`/api/materials/view/${m.id}`}
                           title={m.title}
                           className="w-full border-0"
-                          style={{ height: '80vh' }}
+                          style={{ height: '90svh', minHeight: '500px' }}
                         />
                       )}
 
