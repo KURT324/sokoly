@@ -45,7 +45,7 @@ export function StudentDashboardPage() {
           <>
             {/* Days */}
             <div className="card overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-[#111827] dark:text-slate-100">Учебные дни</h2>
                 <span className="text-xs text-[#6b7280] dark:text-slate-400">{openDays.length} из {days.length} открыто</span>
               </div>
@@ -57,7 +57,7 @@ export function StudentDashboardPage() {
                   desc="Инструктор откроет учебные дни по расписанию"
                 />
               ) : (
-                <div className="p-6 grid grid-cols-4 sm:grid-cols-6 gap-2.5">
+                <div className="p-4 md:p-6 grid grid-cols-5 sm:grid-cols-6 gap-2 md:gap-2.5">
                   {days.map((day) => (
                     <DayCell
                       key={day.id}
@@ -72,7 +72,7 @@ export function StudentDashboardPage() {
             {/* Tests */}
             {tests.length > 0 && (
               <div className="card overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100">
+                <div className="px-4 md:px-6 py-4 border-b border-gray-100">
                   <h2 className="text-sm font-semibold text-[#111827] dark:text-slate-100">Тесты</h2>
                 </div>
                 <div className="divide-y divide-gray-50">
@@ -139,7 +139,7 @@ function TestRow({ test, onClick }: { test: Test; onClick: () => void }) {
     <button
       onClick={canTake ? onClick : undefined}
       disabled={!canTake}
-      className={`w-full text-left px-6 py-4 flex items-center justify-between transition-colors ${
+      className={`w-full text-left px-4 md:px-6 py-4 flex items-center justify-between transition-colors ${
         canTake ? 'hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer' : 'cursor-default'
       }`}
     >

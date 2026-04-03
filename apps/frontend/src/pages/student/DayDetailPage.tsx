@@ -86,12 +86,12 @@ export function StudentDayDetailPage() {
       <div className="max-w-4xl mx-auto">
         <button
           onClick={() => navigate('/student/dashboard')}
-          className="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 mb-4 inline-flex items-center gap-1"
+          className="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 mb-3 inline-flex items-center gap-1 py-1"
         >
           ← Назад
         </button>
 
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-6">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-slate-100 mb-4 md:mb-6">
           День {day.day_number}
         </h1>
 

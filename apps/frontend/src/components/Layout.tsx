@@ -234,6 +234,27 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+// ─── Hamburger icon ──────────────────────────────────────────────────────────
+
+function IconHamburger() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6"  x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  );
+}
+
+function IconClose() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6"  x2="6"  y2="18"/>
+      <line x1="6"  y1="6"  x2="18" y2="18"/>
+    </svg>
+  );
+}
+
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
 interface LayoutProps { children: React.ReactNode }
@@ -248,6 +269,20 @@ export function Layout({ children }: LayoutProps) {
   const [chatsOpen, setChatsOpen] = useState(() =>
     ['/chat/group', '/chat/teacher', '/chat/admin'].some(p => location.pathname.startsWith(p))
   );
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close sidebar on route change (mobile navigation)
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+
+  // Prevent body scroll when sidebar overlay is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     if (!user) return;
@@ -267,125 +302,174 @@ export function Layout({ children }: LayoutProps) {
   const totalUnread = Object.values(unread).reduce((s, v) => s + v, 0);
   const isActive    = (to: string) => location.pathname === to;
 
+  // ── Shared sidebar content ────────────────────────────────────────────────
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="px-5 py-5 flex items-center gap-2.5">
+        <LogoMark size={28} />
+        <span className="font-semibold text-[15px] text-[#111827] dark:text-slate-100 tracking-tight">
+          Соколы Хоруса
+        </span>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 overflow-y-auto pb-4">
+        <ul className="space-y-0.5">
+          {mainNav.map((item) => (
+            <li key={item.to + item.label}>
+              <Link
+                to={item.to}
+                className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-lg text-sm transition-colors ${
+                  isActive(item.to)
+                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-medium'
+                    : 'text-[#6b7280] dark:text-slate-400 hover:text-[#111827] dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                }`}
+              >
+                <span className={isActive(item.to) ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400 dark:text-slate-500'}>
+                  {item.icon}
+                </span>
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        {/* Chats section */}
+        {chatNav.length > 0 && (
+          <div className="mt-4">
+            <button
+              onClick={() => setChatsOpen(o => !o)}
+              className="w-full flex items-center justify-between px-3 py-2.5 md:py-2 rounded-lg text-sm text-[#6b7280] dark:text-slate-400 hover:text-[#111827] dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              <span className="flex items-center gap-2.5">
+                <span className="text-gray-400 dark:text-slate-500"><IconMessage /></span>
+                <span>Чаты</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                {totalUnread > 0 && !chatsOpen && (
+                  <span className="bg-indigo-500 text-white text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {totalUnread > 99 ? '99+' : totalUnread}
+                  </span>
+                )}
+                <span className="text-gray-400 dark:text-slate-500"><IconChevron open={chatsOpen} /></span>
+              </span>
+            </button>
+
+            {chatsOpen && (
+              <ul className="mt-0.5 space-y-0.5">
+                {chatNav.map((item) => (
+                  <li key={item.to + item.label}>
+                    <Link
+                      to={item.to}
+                      className={`flex items-center pl-9 pr-3 py-2 md:py-1.5 rounded-lg text-sm transition-colors ${
+                        isActive(item.to)
+                          ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-medium'
+                          : 'text-[#6b7280] dark:text-slate-400 hover:text-[#111827] dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <span className="text-gray-400 dark:text-slate-500 mr-2">{item.icon}</span>
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </nav>
+
+      {/* User section */}
+      <div className="px-3 py-3 border-t border-gray-100 dark:border-slate-700">
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
+          <div className="w-7 h-7 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 rounded-full flex items-center justify-center shrink-0 text-[11px] font-semibold">
+            {user ? getInitials(user.callsign) : '?'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[#111827] dark:text-slate-100 truncate leading-tight">
+              {user?.callsign}
+            </p>
+            <p className="text-[11px] text-[#6b7280] dark:text-slate-500 leading-tight">
+              {user ? ROLE_LABELS[user.role] : ''}
+            </p>
+          </div>
+          <button
+            onClick={toggleTheme}
+            title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+            className="text-gray-400 dark:text-slate-500 hover:text-[#111827] dark:hover:text-slate-200 transition-colors p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 shrink-0"
+          >
+            {isDark ? <IconSun /> : <IconMoon />}
+          </button>
+          <button
+            onClick={handleLogout}
+            title="Выйти"
+            className="text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
+          >
+            <IconLogOut />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex min-h-screen bg-white dark:bg-slate-950">
 
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside className="fixed left-0 top-0 bottom-0 w-60 bg-white dark:bg-slate-800 border-r border-gray-100 dark:border-slate-700 flex flex-col z-30 select-none">
+      {/* ── Desktop sidebar (md+) ────────────────────────────────────────── */}
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-60 bg-white dark:bg-slate-800 border-r border-gray-100 dark:border-slate-700 flex-col z-30 select-none">
+        {sidebarContent}
+      </aside>
 
-        {/* Logo */}
-        <div className="px-5 py-5 flex items-center gap-2.5">
-          <LogoMark size={28} />
-          <span className="font-semibold text-[15px] text-[#111827] dark:text-slate-100 tracking-tight">
+      {/* ── Mobile overlay backdrop ──────────────────────────────────────── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Mobile slide-in sidebar ──────────────────────────────────────── */}
+      <aside
+        className={`fixed left-0 top-0 bottom-0 w-72 bg-white dark:bg-slate-800 border-r border-gray-100 dark:border-slate-700 flex flex-col z-50 select-none md:hidden transition-transform duration-250 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="absolute top-4 right-4 text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+          aria-label="Закрыть меню"
+        >
+          <IconClose />
+        </button>
+        {sidebarContent}
+      </aside>
+
+      {/* ── Mobile top header ────────────────────────────────────────────── */}
+      <header className="fixed top-0 left-0 right-0 h-14 bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 flex items-center px-4 z-30 md:hidden">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors -ml-1"
+          aria-label="Открыть меню"
+        >
+          <IconHamburger />
+        </button>
+        <div className="flex items-center gap-2 ml-3">
+          <LogoMark size={24} />
+          <span className="font-semibold text-[14px] text-[#111827] dark:text-slate-100 tracking-tight">
             Соколы Хоруса
           </span>
         </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-3 overflow-y-auto pb-4">
-          <ul className="space-y-0.5">
-            {mainNav.map((item) => (
-              <li key={item.to + item.label}>
-                <Link
-                  to={item.to}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    isActive(item.to)
-                      ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-medium'
-                      : 'text-[#6b7280] dark:text-slate-400 hover:text-[#111827] dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700/50'
-                  }`}
-                >
-                  <span className={isActive(item.to) ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400 dark:text-slate-500'}>
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          {/* Chats section */}
-          {chatNav.length > 0 && (
-            <div className="mt-4">
-              <button
-                onClick={() => setChatsOpen(o => !o)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-[#6b7280] dark:text-slate-400 hover:text-[#111827] dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className="text-gray-400 dark:text-slate-500"><IconMessage /></span>
-                  <span>Чаты</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  {totalUnread > 0 && !chatsOpen && (
-                    <span className="bg-indigo-500 text-white text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                      {totalUnread > 99 ? '99+' : totalUnread}
-                    </span>
-                  )}
-                  <span className="text-gray-400 dark:text-slate-500"><IconChevron open={chatsOpen} /></span>
-                </span>
-              </button>
-
-              {chatsOpen && (
-                <ul className="mt-0.5 space-y-0.5">
-                  {chatNav.map((item) => (
-                    <li key={item.to + item.label}>
-                      <Link
-                        to={item.to}
-                        className={`flex items-center pl-9 pr-3 py-1.5 rounded-lg text-sm transition-colors ${
-                          isActive(item.to)
-                            ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-medium'
-                            : 'text-[#6b7280] dark:text-slate-400 hover:text-[#111827] dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700/50'
-                        }`}
-                      >
-                        <span className="text-gray-400 dark:text-slate-500 mr-2">{item.icon}</span>
-                        {item.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </nav>
-
-        {/* User section */}
-        <div className="px-3 py-3 border-t border-gray-100 dark:border-slate-700">
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
-            {/* Avatar */}
-            <div className="w-7 h-7 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 rounded-full flex items-center justify-center shrink-0 text-[11px] font-semibold">
-              {user ? getInitials(user.callsign) : '?'}
-            </div>
-            {/* Name + role */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[#111827] dark:text-slate-100 truncate leading-tight">
-                {user?.callsign}
-              </p>
-              <p className="text-[11px] text-[#6b7280] dark:text-slate-500 leading-tight">
-                {user ? ROLE_LABELS[user.role] : ''}
-              </p>
-            </div>
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              title={isDark ? 'Светлая тема' : 'Тёмная тема'}
-              className="text-gray-400 dark:text-slate-500 hover:text-[#111827] dark:hover:text-slate-200 transition-colors p-1 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 shrink-0"
-            >
-              {isDark ? <IconSun /> : <IconMoon />}
-            </button>
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              title="Выйти"
-              className="text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
-            >
-              <IconLogOut />
-            </button>
-          </div>
-        </div>
-      </aside>
+        {totalUnread > 0 && (
+          <span className="ml-auto bg-indigo-500 text-white text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+            {totalUnread > 99 ? '99+' : totalUnread}
+          </span>
+        )}
+      </header>
 
       {/* ── Main content ─────────────────────────────────────────────────── */}
-      <div className="flex-1 ml-60 min-h-screen bg-[#fafafa] dark:bg-slate-950">
-        <main className="px-8 py-8">
+      <div className="flex-1 md:ml-60 min-h-screen bg-[#fafafa] dark:bg-slate-950">
+        <main className="pt-14 md:pt-0 px-4 py-4 md:px-8 md:py-8">
           {children}
         </main>
       </div>
