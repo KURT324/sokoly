@@ -889,7 +889,7 @@ export function TeacherCardsPage() {
             src={lightboxSrc}
             alt="full"
             onClick={(e) => e.stopPropagation()}
-            className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain shadow-2xl"
+            className="max-w-[95vw] max-h-[95vh] rounded-lg object-contain shadow-2xl"
           />
         </div>
       )}
