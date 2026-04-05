@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -217,6 +217,7 @@ export function TeacherCardsPage() {
   const [showCommentField, setShowCommentField] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [expandedAttempts, setExpandedAttempts] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   // DnD
   const [draggingCard, setDraggingCard] = useState<CardLibrary | null>(null);
@@ -365,6 +366,14 @@ export function TeacherCardsPage() {
     const r = await cardTasksApi.getTask(task.id);
     setSelected(r.data); setTeacherComment(''); setShowCommentField(false); setExpandedAttempts(false);
   };
+
+  const closeLightbox = useCallback(() => setLightboxSrc(null), []);
+  useEffect(() => {
+    if (!lightboxSrc) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeLightbox(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxSrc, closeLightbox]);
 
   const handleReview = async (is_correct: boolean) => {
     if (!selected) return;
@@ -785,17 +794,14 @@ export function TeacherCardsPage() {
                   if (!latest) return <p className="text-sm text-gray-400 dark:text-slate-500">Попыток ещё не было</p>;
                   return (
                     <div className="space-y-3">
-                      <div className="flex gap-4 flex-wrap">
-                        <div>
-                          <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Оригинал:</p>
-                          <img src={cardTasksApi.getImageUrl(selected.image_path)} alt="original"
-                            className="h-48 rounded border border-gray-200 dark:border-slate-700 object-contain" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Аннотация (попытка #{latest.attempt_number}):</p>
-                          <img src={cardTasksApi.getAnnotationUrl(latest.annotation_path)} alt="annotation"
-                            className="h-48 rounded border border-gray-200 dark:border-slate-700 object-contain" />
-                        </div>
+                      <div>
+                        <p className="text-xs text-gray-400 dark:text-slate-500 mb-1">Аннотация (попытка #{latest.attempt_number}):</p>
+                        <img
+                          src={cardTasksApi.getAnnotationUrl(latest.annotation_path)}
+                          alt="annotation"
+                          onClick={() => setLightboxSrc(cardTasksApi.getAnnotationUrl(latest.annotation_path))}
+                          className="h-48 rounded border border-gray-200 dark:border-slate-700 object-contain cursor-zoom-in"
+                        />
                       </div>
                       <p className="text-sm bg-gray-50 dark:bg-slate-700/30 rounded-lg px-3 py-2">
                         <span className="font-medium text-gray-700 dark:text-slate-200">Комментарий курсанта:</span>{' '}
@@ -814,8 +820,12 @@ export function TeacherCardsPage() {
                       <div className="mt-3 space-y-3 border-t border-gray-100 dark:border-slate-700 pt-3">
                         {selected.attempts.slice(0, -1).map((att) => (
                           <div key={att.id} className="flex gap-3 items-start">
-                            <img src={cardTasksApi.getAnnotationUrl(att.annotation_path)} alt={`attempt ${att.attempt_number}`}
-                              className="h-24 rounded border border-gray-200 dark:border-slate-700 object-contain" />
+                            <img
+                              src={cardTasksApi.getAnnotationUrl(att.annotation_path)}
+                              alt={`attempt ${att.attempt_number}`}
+                              onClick={() => setLightboxSrc(cardTasksApi.getAnnotationUrl(att.annotation_path))}
+                              className="h-24 rounded border border-gray-200 dark:border-slate-700 object-contain cursor-zoom-in"
+                            />
                             <div className="text-sm space-y-1">
                               <p className="text-gray-500 dark:text-slate-400">Попытка #{att.attempt_number}</p>
                               <p className="text-gray-700 dark:text-slate-200">{att.student_comment}</p>
@@ -862,6 +872,27 @@ export function TeacherCardsPage() {
           </div>
         )}
       </div>
+
+      {/* Lightbox */}
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={closeLightbox}
+        >
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 text-white bg-black/50 hover:bg-black/70 rounded-full w-9 h-9 flex items-center justify-center text-lg"
+          >
+            ✕
+          </button>
+          <img
+            src={lightboxSrc}
+            alt="full"
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain shadow-2xl"
+          />
+        </div>
+      )}
     </Layout>
   );
 }
