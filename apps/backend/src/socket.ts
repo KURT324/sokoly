@@ -45,6 +45,9 @@ export function setupSocket(io: SocketIOServer) {
   io.on('connection', async (socket) => {
     const user: SocketUser = (socket as any).user;
 
+    // Join personal room for direct messages
+    socket.join(`user:${user.id}`);
+
     // Join chat rooms
     const chats = await getUserChats(user);
     for (const chat of chats) {

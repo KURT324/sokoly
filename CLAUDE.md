@@ -49,7 +49,8 @@
 │   │   │       ├── card-tasks/       # /api/card-tasks
 │   │   │       ├── card-folders/     # /api/card-folders
 │   │   │       ├── analytics/        # /api/analytics
-│   │   │       └── chats/            # /api/chats
+│   │   │       ├── chats/            # /api/chats
+│   │   │       └── direct-chats/     # /api/direct-chats
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma
 │   │   │   └── migrations/           # SQL-файлы, применяются через prisma db push
@@ -62,7 +63,8 @@
 │       │   └── pages/
 │       │       ├── admin/            # Dashboard, Cohorts, Users, Analytics
 │       │       ├── teacher/          # Dashboard, Days, DayDetail, Tests, TestCreate,
-│       │       │                     # TestResults, Students, Analytics, Cards, MaterialLibrary
+│       │       │                     # TestResults, Students, Analytics, Cards, MaterialLibrary,
+│       │       │                     # DirectChatsPage (личные сообщения инструктора)
 │       │       ├── student/          # Dashboard, DayDetail, TestPage, Cards
 │       │       ├── chat/             # AdminChat, GroupChat, TeacherChat
 │       │       ├── LoginPage.tsx
@@ -103,6 +105,7 @@
 - **Курсанты** — список курсантов группы со статистикой (тесты сданы, карточки выполнены, последний вход)
 - **Аналитика** — таблица результатов тестов по группе (оценки в формате "X из Y"); таблица прогресса по карточкам (% с первой попытки, среднее попыток)
 - **Чат** — список всех чатов всех групп; отправка сообщений (текст + файлы до 10 МБ); пагинация истории; отметка прочитанных
+- **Личные сообщения** (`/direct-chats`) — текстовый чат между инструкторами/администраторами. Real-time через Socket.IO (`direct:message`). Личные комнаты: `user:<id>`
 
 ### Курсант
 - **Дашборд** — карта дней (сетка), список доступных тестов, список карточек
@@ -142,6 +145,8 @@
 | `CardAttempt` | Попытка курсанта: annotated image + комментарии + `is_correct` |
 | `Chat` | Чат группы (GROUP/STUDENT_TEACHER/STUDENT_ADMIN) |
 | `ChatMessage` | Сообщение с `attachments_json` |
+| `DirectChat` | Личный чат между двумя инструкторами/админами. `@@unique([user1_id, user2_id])`, пара нормализована через `.sort()` |
+| `DirectMessage` | Сообщение в личном чате. `is_read`, cascade от DirectChat |
 
 ### Ключевые связи
 - `User → Cohort` (M:1, nullable для ADMIN/TEACHER)

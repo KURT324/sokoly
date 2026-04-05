@@ -18,6 +18,7 @@ import { materialLibraryRoutes } from './routes/material-library';
 import { materialsPublicRoutes } from './routes/materials';
 import { analyticsRoutes } from './routes/analytics';
 import { chatsRoutes } from './routes/chats';
+import { directChatsRoutes } from './routes/direct-chats';
 import { setupSocket } from './socket';
 
 // BigInt is not JSON-serializable by default; Prisma returns BigInt for some aggregate fields
@@ -75,6 +76,7 @@ async function bootstrap() {
   app.register(materialsPublicRoutes, { prefix: '/api/materials' });
   app.register(analyticsRoutes, { prefix: '/api/analytics' });
   app.register(chatsRoutes, { prefix: '/api/chats' });
+  app.register(directChatsRoutes, { prefix: '/api/direct-chats' });
 
   await app.listen({ port: Number(process.env.PORT) || 3000, host: '0.0.0.0' });
 }

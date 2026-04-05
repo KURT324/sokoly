@@ -26,6 +26,7 @@ import { TeacherAnalyticsPage } from './pages/teacher/AnalyticsPage';
 import { AdminAnalyticsPage } from './pages/admin/AnalyticsPage';
 import { MaterialLibraryPage } from './pages/teacher/MaterialLibraryPage';
 import { TeacherStudentsPage } from './pages/teacher/StudentsPage';
+import { DirectChatsPage } from './pages/teacher/DirectChatsPage';
 
 const queryClient = new QueryClient();
 
@@ -114,6 +115,11 @@ export default function App() {
           } />
           <Route path="/admin/analytics" element={
             <PrivateRoute allowedRoles={[UserRole.ADMIN]}><AdminAnalyticsPage /></PrivateRoute>
+          } />
+
+          {/* Direct chats (teacher/admin) */}
+          <Route path="/direct-chats" element={
+            <PrivateRoute allowedRoles={[UserRole.TEACHER, UserRole.ADMIN]}><DirectChatsPage /></PrivateRoute>
           } />
 
           {/* Chats */}

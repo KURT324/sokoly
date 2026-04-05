@@ -155,6 +155,10 @@ export async function adminUsersRoutes(app: FastifyInstance) {
       await tx.testSubmission.deleteMany({ where: { student_id: id } });
       // 4. ChatMessage (sender_id FK, no cascade)
       await tx.chatMessage.deleteMany({ where: { sender_id: id } });
+      // 4b. DirectMessage sent by user (cascade would handle chat deletion but sender_id FK has no cascade)
+      await tx.directMessage.deleteMany({ where: { sender_id: id } });
+      // 4c. DirectChat (user1_id/user2_id FKs have CASCADE in migration but Prisma schema doesn't declare it — be explicit)
+      await tx.directChat.deleteMany({ where: { OR: [{ user1_id: id }, { user2_id: id }] } });
       // 5. TestVariantAssignment (has onDelete: Cascade but be explicit)
       await tx.testVariantAssignment.deleteMany({ where: { student_id: id } });
       // 6. User

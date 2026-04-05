@@ -69,9 +69,12 @@ model User {
   created_tasks    CardTask[]       @relation("CreatedBy")
   library_cards    CardLibrary[]    @relation("LibraryCreatedBy")
   card_folders     CardFolder[]     @relation("FolderCreatedBy")
-  chat_messages        ChatMessage[]
-  variant_assignments  TestVariantAssignment[]
-  library_materials    MaterialLibrary[]       @relation("LibraryMaterialCreatedBy")
+  chat_messages          ChatMessage[]
+  variant_assignments    TestVariantAssignment[]
+  library_materials      MaterialLibrary[]       @relation("LibraryMaterialCreatedBy")
+  direct_chats_as_user1  DirectChat[]            @relation("DirectChatUser1")
+  direct_chats_as_user2  DirectChat[]            @relation("DirectChatUser2")
+  sent_direct_messages   DirectMessage[]         @relation("DirectMessageSender")
 
   @@map("users")
 }
@@ -309,6 +312,34 @@ model Chat {
   messages ChatMessage[]
 
   @@map("chats")
+}
+
+model DirectChat {
+  id         String   @id @default(uuid())
+  user1_id   String
+  user2_id   String
+  created_at DateTime @default(now())
+
+  user1    User            @relation("DirectChatUser1", fields: [user1_id], references: [id])
+  user2    User            @relation("DirectChatUser2", fields: [user2_id], references: [id])
+  messages DirectMessage[]
+
+  @@unique([user1_id, user2_id])
+  @@map("direct_chats")
+}
+
+model DirectMessage {
+  id         String   @id @default(uuid())
+  chat_id    String
+  sender_id  String
+  content    String
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  chat   DirectChat @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+  sender User       @relation("DirectMessageSender", fields: [sender_id], references: [id])
+
+  @@map("direct_messages")
 }
 
 model ChatMessage {

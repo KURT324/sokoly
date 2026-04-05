@@ -207,13 +207,15 @@ const MAIN_NAV: Record<UserRole, NavItem[]> = {
 
 const CHAT_NAV: Record<UserRole, NavItem[]> = {
   [UserRole.ADMIN]: [
-    { label: 'Общий чат', to: '/chat/group',   icon: <IconHash />, chatType: 'GROUP' },
-    { label: 'Курсанты',  to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
-    { label: 'Личные',    to: '/chat/admin',   icon: <IconHash />, chatType: 'STUDENT_ADMIN' },
+    { label: 'Общий чат',  to: '/chat/group',    icon: <IconHash />, chatType: 'GROUP' },
+    { label: 'Курсанты',   to: '/chat/teacher',  icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
+    { label: 'Личные',     to: '/chat/admin',    icon: <IconHash />, chatType: 'STUDENT_ADMIN' },
+    { label: 'Инструктора', to: '/direct-chats', icon: <IconHash /> },
   ],
   [UserRole.TEACHER]: [
-    { label: 'Общий чат', to: '/chat/group',   icon: <IconHash />, chatType: 'GROUP' },
-    { label: 'Курсанты',  to: '/chat/teacher', icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
+    { label: 'Общий чат',  to: '/chat/group',    icon: <IconHash />, chatType: 'GROUP' },
+    { label: 'Курсанты',   to: '/chat/teacher',  icon: <IconHash />, chatType: 'STUDENT_TEACHER' },
+    { label: 'Инструктора', to: '/direct-chats', icon: <IconHash /> },
   ],
   [UserRole.STUDENT]: [
     { label: 'Общий чат',     to: '/chat/group',   icon: <IconHash />, chatType: 'GROUP' },
@@ -267,7 +269,7 @@ export function Layout({ children }: LayoutProps) {
   const { isDark, toggle: toggleTheme } = useTheme();
 
   const [chatsOpen, setChatsOpen] = useState(() =>
-    ['/chat/group', '/chat/teacher', '/chat/admin'].some(p => location.pathname.startsWith(p))
+    ['/chat/group', '/chat/teacher', '/chat/admin', '/direct-chats'].some(p => location.pathname.startsWith(p))
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
