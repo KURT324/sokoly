@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { daysApi, DayRecord } from '../../api/days';
 import { adminApi, CohortRecord } from '../../api/admin';
+import { cohortsApi } from '../../api/cohorts';
 import { DayStatus } from '@eduplatform/shared';
 import { Layout } from '../../components/Layout';
 
@@ -33,15 +34,23 @@ export function TeacherDaysPage() {
         setCohorts(r.data);
         if (r.data.length > 0) setSelectedCohort(r.data[0].id);
       });
+    } else {
+      cohortsApi.getCohorts().then((r) => {
+        // cohortsApi returns Cohort[] — map to CohortRecord shape (id + name)
+        const mapped: CohortRecord[] = r.data.map((c) => ({ id: c.id, name: c.name } as CohortRecord));
+        setCohorts(mapped);
+        if (mapped.length > 0) setSelectedCohort(mapped[0].id);
+      });
     }
   }, [isAdmin]);
 
   useEffect(() => {
+    if (!selectedCohort) return;
     setLoading(true);
-    daysApi.getDays(isAdmin ? selectedCohort || undefined : undefined)
+    daysApi.getDays(selectedCohort)
       .then((r) => setDays(r.data))
       .finally(() => setLoading(false));
-  }, [selectedCohort, isAdmin]);
+  }, [selectedCohort]);
 
   const handleToggle = async (day: DayRecord) => {
     const action = day.status === DayStatus.OPEN ? 'закрыть' : 'открыть';
@@ -61,13 +70,12 @@ export function TeacherDaysPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Учебные дни</h1>
-          {isAdmin && cohorts.length > 0 && (
+          {cohorts.length > 0 && (
             <select
               value={selectedCohort}
               onChange={(e) => setSelectedCohort(e.target.value)}
               className="border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Все группы</option>
               {cohorts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
