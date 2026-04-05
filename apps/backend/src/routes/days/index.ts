@@ -8,6 +8,7 @@ import { UserRole, MaterialType } from '@prisma/client';
 import { prisma } from '../../db';
 import { authGuard, roleGuard } from '../../middleware/authGuard';
 import { applyImageWatermark, applyPdfWatermark } from '../../services/watermark';
+import { processImageFile } from '../../services/imageProcessor';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 const VIDEO_MAX_SIZE = 500 * 1024 * 1024;  // 500 MB for video
@@ -151,12 +152,16 @@ export async function daysRoutes(app: FastifyInstance) {
     // Ensure storage directory exists
     await fs.mkdir(STORAGE_PATH, { recursive: true });
 
-    const storedName = `${uuidv4()}${ext}`;
-    const storedPath = path.join(STORAGE_PATH, storedName);
+    let storedName = `${uuidv4()}${ext}`;
+    let storedPath = path.join(STORAGE_PATH, storedName);
 
     await pipeline(data.file, fsSync.createWriteStream(storedPath));
 
-    const stat = await fs.stat(storedPath);
+    const processed = await processImageFile(storedPath);
+    storedPath = processed.outputPath;
+    storedName = path.basename(processed.outputPath);
+
+    const stat = { size: processed.sizeBytes };
     const title = data.fields?.title
       ? (data.fields.title as { value: string }).value
       : data.filename;

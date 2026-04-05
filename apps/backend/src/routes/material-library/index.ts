@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserRole, MaterialType } from '@prisma/client';
 import { prisma } from '../../db';
 import { roleGuard } from '../../middleware/authGuard';
+import { processImageFile } from '../../services/imageProcessor';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 const VIDEO_MAX_SIZE = 500 * 1024 * 1024;
@@ -75,11 +76,15 @@ export async function materialLibraryRoutes(app: FastifyInstance) {
     }
 
     await fs.mkdir(STORAGE_PATH, { recursive: true });
-    const storedName = `${uuidv4()}${ext}`;
-    const storedPath = path.join(STORAGE_PATH, storedName);
+    let storedName = `${uuidv4()}${ext}`;
+    let storedPath = path.join(STORAGE_PATH, storedName);
     await pipeline(data.file, fsSync.createWriteStream(storedPath));
 
-    const stat = await fs.stat(storedPath);
+    const processed = await processImageFile(storedPath);
+    storedPath = processed.outputPath;
+    storedName = path.basename(processed.outputPath);
+
+    const stat = { size: processed.sizeBytes };
     const title = data.fields?.title
       ? (data.fields.title as { value: string }).value
       : data.filename;

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserRole, CardTaskStatus } from '@prisma/client';
 import { prisma } from '../../db';
 import { authGuard, roleGuard } from '../../middleware/authGuard';
+import { processImageFile } from '../../services/imageProcessor';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
@@ -58,9 +59,11 @@ export async function cardTasksRoutes(app: FastifyInstance) {
           return reply.status(400).send({ error: 'Image files only' });
         }
         await fs.mkdir(path.join(STORAGE_PATH, 'cards'), { recursive: true });
-        const filename = `${uuidv4()}${ext}`;
-        await pipeline(part.file, fsSync.createWriteStream(path.join(STORAGE_PATH, 'cards', filename)));
-        imagePath = filename;
+        const rawName = `${uuidv4()}${ext}`;
+        const rawPath = path.join(STORAGE_PATH, 'cards', rawName);
+        await pipeline(part.file, fsSync.createWriteStream(rawPath));
+        const processed = await processImageFile(rawPath);
+        imagePath = path.basename(processed.outputPath);
       }
     }
 
@@ -242,9 +245,11 @@ export async function cardTasksRoutes(app: FastifyInstance) {
         student_comment = part.value as string;
       } else if (part.type === 'file' && part.fieldname === 'annotation') {
         await fs.mkdir(path.join(STORAGE_PATH, 'annotations'), { recursive: true });
-        const filename = `${uuidv4()}.png`;
-        await pipeline(part.file, fsSync.createWriteStream(path.join(STORAGE_PATH, 'annotations', filename)));
-        annotationPath = filename;
+        const rawName = `${uuidv4()}.png`;
+        const rawPath = path.join(STORAGE_PATH, 'annotations', rawName);
+        await pipeline(part.file, fsSync.createWriteStream(rawPath));
+        const processed = await processImageFile(rawPath);
+        annotationPath = path.basename(processed.outputPath);
       }
     }
 

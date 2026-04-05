@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../../db';
 import { roleGuard, authGuard } from '../../middleware/authGuard';
+import { processImageFile } from '../../services/imageProcessor';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
@@ -152,14 +153,16 @@ export async function directChatsRoutes(app: FastifyInstance) {
         } else if (part.type === 'file') {
           await fs.mkdir(path.join(STORAGE_PATH, 'chat-files'), { recursive: true });
           const ext = path.extname(part.filename).toLowerCase();
-          const storedName = `${uuidv4()}${ext}`;
-          await pipeline(part.file, fsSync.createWriteStream(path.join(STORAGE_PATH, 'chat-files', storedName)));
-          const stat = await fs.stat(path.join(STORAGE_PATH, 'chat-files', storedName));
+          let storedName = `${uuidv4()}${ext}`;
+          const rawPath = path.join(STORAGE_PATH, 'chat-files', storedName);
+          await pipeline(part.file, fsSync.createWriteStream(rawPath));
+          const processed = await processImageFile(rawPath);
+          storedName = path.basename(processed.outputPath);
           attachments.push({
             filename: part.filename,
             storage_path: storedName,
             mime_type: part.mimetype,
-            size: stat.size,
+            size: processed.sizeBytes,
           });
         }
       }
