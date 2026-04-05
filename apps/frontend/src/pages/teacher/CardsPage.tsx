@@ -245,12 +245,8 @@ export function TeacherCardsPage() {
   useEffect(() => {
     loadLibrary();
     loadAssignments();
-    cardTasksApi.getStudents().then((r) => {
-      console.log('[CardsPage] students[0]:', r.data[0]);
-      setStudents(r.data);
-    });
+    cardTasksApi.getStudents().then((r) => setStudents(r.data));
     cohortsApi.getCohorts().then((r) => {
-      console.log('[CardsPage] cohorts:', r.data.map((c) => ({ id: c.id, name: c.name })));
       setCohorts(r.data);
       if (r.data.length > 0) setSelectedCohortId(r.data[0].id);
     });
@@ -751,7 +747,7 @@ export function TeacherCardsPage() {
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">Все курсанты</option>
-                {students
+                {cohortStudents
                   .filter((s) => assignments.some((t) => t.student_id === s.id))
                   .map((s) => (
                     <option key={s.id} value={s.id}>{s.callsign}</option>
