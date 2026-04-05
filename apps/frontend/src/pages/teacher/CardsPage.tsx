@@ -211,6 +211,7 @@ export function TeacherCardsPage() {
   const [assignments, setAssignments] = useState<CardTask[]>([]);
   const [loadingAssign, setLoadingAssign] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CardTaskStatus | 'ALL'>('ALL');
+  const [studentFilter, setStudentFilter] = useState<string>('ALL');
   const [selected, setSelected] = useState<CardTask | null>(null);
   const [teacherComment, setTeacherComment] = useState('');
   const [showCommentField, setShowCommentField] = useState(false);
@@ -383,8 +384,17 @@ export function TeacherCardsPage() {
     ? library.filter((c) => c.folder_id === openFolderId)
     : library.filter((c) => !c.folder_id);
   const visibleFolders = openFolderId ? [] : folders;
-  const filteredAssignments = statusFilter === 'ALL' ? assignments : assignments.filter((t) => t.status === statusFilter);
+  const filteredAssignments = assignments
+    .filter((t) => statusFilter === 'ALL' || t.status === statusFilter)
+    .filter((t) => studentFilter === 'ALL' || t.student_id === studentFilter);
   const pendingCount = assignments.filter((t) => t.status === 'AWAITING_REVIEW').length;
+
+  // Stats (over all assignments, ignoring filters)
+  const statsTotal = assignments.length;
+  const statsCompleted = assignments.filter((t) => t.status === 'COMPLETED').length;
+  const statsPending = assignments.filter((t) => t.status === 'PENDING').length;
+  const statsReturned = assignments.filter((t) => t.status === 'RETURNED').length;
+  const statsCompletedPct = statsTotal > 0 ? Math.round((statsCompleted / statsTotal) * 100) : 0;
 
   return (
     <Layout>
@@ -662,8 +672,47 @@ export function TeacherCardsPage() {
 
         {/* ══ Assignments Tab ══════════════════════════════════════════════════ */}
         {tab === 'assignments' && (
+          <div className="space-y-4">
+            {/* Stats */}
+            {!loadingAssign && statsTotal > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3">
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mb-0.5">Всего</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{statsTotal}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3">
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mb-0.5">Выполнено</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{statsCompleted}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500">{statsCompletedPct}%</p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3">
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mb-0.5">Ожидает</p>
+                  <p className="text-2xl font-bold text-gray-600 dark:text-slate-300">{statsPending}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3">
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mb-0.5">Возвращено</p>
+                  <p className="text-2xl font-bold text-red-500 dark:text-red-400">{statsReturned}</p>
+                </div>
+              </div>
+            )}
+
           <div className="flex gap-6">
             <div className="w-72 shrink-0 space-y-3">
+              {/* Student filter */}
+              <select
+                value={studentFilter}
+                onChange={(e) => setStudentFilter(e.target.value)}
+                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">Все курсанты</option>
+                {students
+                  .filter((s) => assignments.some((t) => t.student_id === s.id))
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>{s.callsign}</option>
+                  ))}
+              </select>
+
+              {/* Status filter */}
               <div className="flex flex-wrap gap-1.5">
                 {(['ALL', 'AWAITING_REVIEW', 'PENDING', 'RETURNED', 'COMPLETED'] as const).map((s) => (
                   <button key={s} onClick={() => setStatusFilter(s)}
@@ -676,27 +725,40 @@ export function TeacherCardsPage() {
                   </button>
                 ))}
               </div>
+
               {loadingAssign ? (
                 <p className="text-gray-400 dark:text-slate-500 text-sm">Загрузка...</p>
               ) : filteredAssignments.length === 0 ? (
                 <div className="text-center text-gray-400 dark:text-slate-500 text-sm py-8">Нет назначений</div>
-              ) : filteredAssignments.map((task) => (
-                <button key={task.id} onClick={() => handleSelectAssignment(task)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
-                    selected?.id === task.id
-                      ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/50'
-                  }`}>
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <p className="font-medium text-sm text-gray-900 dark:text-slate-100 truncate">{task.student?.callsign}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${STATUS_COLORS[task.status]}`}>
-                      {STATUS_LABELS[task.status]}
-                    </span>
-                  </div>
-                  {task.library && <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{task.library.title}</p>}
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{new Date(task.created_at).toLocaleDateString('ru-RU')}</p>
-                </button>
-              ))}
+              ) : filteredAssignments.map((task) => {
+                const lastAttempt = task.attempts[task.attempts.length - 1];
+                return (
+                  <button key={task.id} onClick={() => handleSelectAssignment(task)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
+                      selected?.id === task.id
+                        ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                    }`}>
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <p className="font-medium text-sm text-gray-900 dark:text-slate-100 truncate">{task.student?.callsign}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${STATUS_COLORS[task.status]}`}>
+                        {STATUS_LABELS[task.status]}
+                      </span>
+                    </div>
+                    {task.library && <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{task.library.title}</p>}
+                    <div className="flex items-center justify-between mt-1 gap-2">
+                      <span className="text-xs text-gray-400 dark:text-slate-500">
+                        {task.attempts.length > 0 ? `Попыток: ${task.attempts.length}` : 'Нет попыток'}
+                      </span>
+                      {lastAttempt && (
+                        <span className="text-xs text-gray-400 dark:text-slate-500 shrink-0">
+                          {new Date(lastAttempt.submitted_at).toLocaleDateString('ru-RU')}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {selected ? (
@@ -796,6 +858,7 @@ export function TeacherCardsPage() {
                 Выберите назначение из списка
               </div>
             )}
+          </div>
           </div>
         )}
       </div>
