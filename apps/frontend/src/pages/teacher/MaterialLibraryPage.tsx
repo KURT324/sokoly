@@ -23,6 +23,8 @@ export function MaterialLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadCurrent, setUploadCurrent] = useState(0);
+  const [uploadTotal, setUploadTotal] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
 
@@ -81,18 +83,27 @@ export function MaterialLibraryPage() {
     return entries;
   }, [items]);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFilesUpload = async (files: File[]) => {
+    if (files.length === 0) return;
     const videoTypes = ['video/mp4', 'video/x-msvideo', 'video/quicktime', 'video/x-matroska'];
-    const isVideo = videoTypes.includes(file.type) || /\.(mp4|avi|mov|mkv)$/i.test(file.name);
-    const maxSize = isVideo ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return setError(isVideo ? 'Видео слишком большое. Максимум 500 МБ' : 'Файл слишком большой. Максимум 50 МБ');
+    for (const file of files) {
+      const isVideo = videoTypes.includes(file.type) || /\.(mp4|avi|mov|mkv)$/i.test(file.name);
+      const maxSize = isVideo ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
+      if (file.size > maxSize) {
+        return setError(isVideo
+          ? `«${file.name}»: видео слишком большое. Максимум 500 МБ`
+          : `«${file.name}»: файл слишком большой. Максимум 50 МБ`);
+      }
     }
     setError('');
     setUploading(true);
-    setProgress(0);
+    setUploadTotal(files.length);
     try {
-      await materialLibraryApi.uploadFile(file, file.name, uploadFolder, setProgress);
+      for (let i = 0; i < files.length; i++) {
+        setUploadCurrent(i + 1);
+        setProgress(0);
+        await materialLibraryApi.uploadFile(files[i], files[i].name, uploadFolder, setProgress);
+      }
       setUploadFolder('');
       load();
     } catch {
@@ -100,14 +111,16 @@ export function MaterialLibraryPage() {
     } finally {
       setUploading(false);
       setProgress(0);
+      setUploadCurrent(0);
+      setUploadTotal(0);
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) handleFilesUpload(files);
   };
 
   const handleAddLink = async () => {
@@ -142,7 +155,11 @@ export function MaterialLibraryPage() {
         >
           {uploading ? (
             <div>
-              <div className="text-sm text-gray-600 dark:text-slate-400 mb-3">Загрузка... {progress}%</div>
+              <div className="text-sm text-gray-600 dark:text-slate-400 mb-3">
+                {uploadTotal > 1
+                  ? `Загружается ${uploadCurrent} из ${uploadTotal}... ${progress}%`
+                  : `Загрузка... ${progress}%`}
+              </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
               </div>
@@ -175,7 +192,7 @@ export function MaterialLibraryPage() {
                   onClick={() => fileInputRef.current?.click()}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg font-medium"
                 >
-                  Выбрать файл
+                  Выбрать файлы
                 </button>
                 <button
                   onClick={() => setShowLinkForm(true)}
@@ -189,9 +206,14 @@ export function MaterialLibraryPage() {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             className="hidden"
             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.mp4,.avi,.mov,.mkv"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) handleFilesUpload(files);
+              e.target.value = '';
+            }}
           />
         </div>
 
