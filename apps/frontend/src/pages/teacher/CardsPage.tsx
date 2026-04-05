@@ -20,6 +20,7 @@ import {
   CardTaskStatus,
   StudentInfo,
 } from '../../api/cardTasks';
+import { cohortsApi, Cohort } from '../../api/cohorts';
 
 type Tab = 'library' | 'assignments';
 
@@ -193,6 +194,10 @@ export function TeacherCardsPage() {
   const [renamingFolder, setRenamingFolder] = useState<CardFolder | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
+  // Cohort filter for assign
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [selectedCohortId, setSelectedCohortId] = useState<string>('');
+
   // Assign panel
   const [assignCard, setAssignCard] = useState<CardLibrary | null>(null);
   const [students, setStudents] = useState<StudentInfo[]>([]);
@@ -241,6 +246,10 @@ export function TeacherCardsPage() {
     loadLibrary();
     loadAssignments();
     cardTasksApi.getStudents().then((r) => setStudents(r.data));
+    cohortsApi.getCohorts().then((r) => {
+      setCohorts(r.data);
+      if (r.data.length > 0) setSelectedCohortId(r.data[0].id);
+    });
   }, []);
 
   // ── Library actions ─────────────────────────────────────────────────────────
@@ -388,6 +397,10 @@ export function TeacherCardsPage() {
   };
 
   // ── Derived state ───────────────────────────────────────────────────────────
+  const cohortStudents = selectedCohortId
+    ? students.filter((s) => s.cohort_id === selectedCohortId)
+    : students;
+
   const openFolder = folders.find((f) => f.id === openFolderId) ?? null;
   const visibleCards = openFolderId
     ? library.filter((c) => c.folder_id === openFolderId)
@@ -409,6 +422,26 @@ export function TeacherCardsPage() {
     <Layout>
       <div className="max-w-6xl mx-auto space-y-5">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Карточки</h1>
+
+        {/* Cohort selector */}
+        {cohorts.length > 0 && (
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-300 shrink-0">Группа:</label>
+            <select
+              value={selectedCohortId}
+              onChange={(e) => {
+                setSelectedCohortId(e.target.value);
+                setAssignStudentId('');
+                setAssignFolderStudentId('');
+              }}
+              className="border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {cohorts.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-slate-700">
@@ -617,7 +650,7 @@ export function TeacherCardsPage() {
                       <select value={assignStudentId} onChange={(e) => setAssignStudentId(e.target.value)}
                         className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Выберите...</option>
-                        {students.map((s) => <option key={s.id} value={s.id}>{s.callsign}</option>)}
+                        {cohortStudents.map((s) => <option key={s.id} value={s.id}>{s.callsign}</option>)}
                       </select>
                     </div>
                     <div>
@@ -650,7 +683,7 @@ export function TeacherCardsPage() {
                       <select value={assignFolderStudentId} onChange={(e) => setAssignFolderStudentId(e.target.value)}
                         className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Выберите...</option>
-                        {students.map((s) => <option key={s.id} value={s.id}>{s.callsign}</option>)}
+                        {cohortStudents.map((s) => <option key={s.id} value={s.id}>{s.callsign}</option>)}
                       </select>
                     </div>
                     {assignFolderMsg && (
