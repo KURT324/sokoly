@@ -245,8 +245,12 @@ export function TeacherCardsPage() {
   useEffect(() => {
     loadLibrary();
     loadAssignments();
-    cardTasksApi.getStudents().then((r) => setStudents(r.data));
+    cardTasksApi.getStudents().then((r) => {
+      console.log('[CardsPage] students[0]:', r.data[0]);
+      setStudents(r.data);
+    });
     cohortsApi.getCohorts().then((r) => {
+      console.log('[CardsPage] cohorts:', r.data.map((c) => ({ id: c.id, name: c.name })));
       setCohorts(r.data);
       if (r.data.length > 0) setSelectedCohortId(r.data[0].id);
     });
@@ -398,7 +402,7 @@ export function TeacherCardsPage() {
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const cohortStudents = selectedCohortId
-    ? students.filter((s) => s.cohort_id === selectedCohortId)
+    ? students.filter((s) => s.cohort_id != null && String(s.cohort_id) === String(selectedCohortId))
     : students;
 
   const openFolder = folders.find((f) => f.id === openFolderId) ?? null;
