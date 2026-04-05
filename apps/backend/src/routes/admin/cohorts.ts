@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { UserRole, ChatType, DayStatus } from '@prisma/client';
 import { prisma } from '../../db';
 import { roleGuard } from '../../middleware/authGuard';
+import { cache } from '../../services/cache';
 
 export async function adminCohortsRoutes(app: FastifyInstance) {
   const adminOnly = { preHandler: roleGuard(UserRole.ADMIN) };
@@ -60,6 +61,7 @@ export async function adminCohortsRoutes(app: FastifyInstance) {
       ],
     });
 
+    await cache.del('cache:cohorts');
     return reply.status(201).send(cohort);
   });
 
@@ -100,6 +102,12 @@ export async function adminCohortsRoutes(app: FastifyInstance) {
     await prisma.user.deleteMany({ where: { cohort_id: id, role: 'STUDENT' } });
     // 9. Cohort
     await prisma.cohort.delete({ where: { id } });
+
+    await Promise.all([
+      cache.del('cache:cohorts'),
+      cache.del(`cache:days:${id}`),
+      cache.del('cache:days:all'),
+    ]);
 
     return { success: true };
   });

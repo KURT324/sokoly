@@ -2,14 +2,24 @@ import { FastifyInstance } from 'fastify';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../db';
 import { roleGuard } from '../middleware/authGuard';
+import { cache } from '../services/cache';
+
+const COHORTS_KEY = 'cache:cohorts';
+const COHORTS_TTL = 300; // 5 minutes
 
 export async function cohortsRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN) }, async () => {
-    return prisma.cohort.findMany({
+    const cached = await cache.get(COHORTS_KEY);
+    if (cached) return cached;
+
+    const cohorts = await prisma.cohort.findMany({
       where: { is_active: true },
       include: { days: { select: { id: true, day_number: true, status: true }, orderBy: { day_number: 'asc' } } },
       orderBy: { started_at: 'desc' },
     });
+
+    await cache.set(COHORTS_KEY, cohorts, COHORTS_TTL);
+    return cohorts;
   });
 
   // GET /api/cohorts/:id/students — roster with per-student stats

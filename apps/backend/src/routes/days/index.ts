@@ -9,6 +9,10 @@ import { prisma } from '../../db';
 import { authGuard, roleGuard } from '../../middleware/authGuard';
 import { applyImageWatermark, applyPdfWatermark } from '../../services/watermark';
 import { processImageFile } from '../../services/imageProcessor';
+import { cache } from '../../services/cache';
+
+const DAYS_TTL = 120; // 2 minutes
+const DAY_TTL  = 120;
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 const VIDEO_MAX_SIZE = 500 * 1024 * 1024;  // 500 MB for video
@@ -53,11 +57,17 @@ export async function daysRoutes(app: FastifyInstance) {
 
     // Teacher / Admin — all days, optionally filtered by cohort
     const { cohort_id } = request.query as { cohort_id?: string };
+    const cacheKey = cohort_id ? `cache:days:${cohort_id}` : 'cache:days:all';
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const days = await prisma.day.findMany({
       where: cohort_id ? { cohort_id } : undefined,
       include: { cohort: { select: { id: true, name: true } } },
       orderBy: [{ cohort_id: 'asc' }, { day_number: 'asc' }],
     });
+
+    await cache.set(cacheKey, days, DAYS_TTL);
     return days;
   });
 
@@ -65,6 +75,13 @@ export async function daysRoutes(app: FastifyInstance) {
   app.get('/:id', { preHandler: authGuard }, async (request, reply) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
+
+    // Only cache teacher/admin responses — students may see restricted views
+    const cacheKey = `cache:day:${id}`;
+    if (user.role !== UserRole.STUDENT) {
+      const cached = await cache.get(cacheKey);
+      if (cached) return cached;
+    }
 
     const day = await prisma.day.findUnique({
       where: { id },
@@ -82,8 +99,10 @@ export async function daysRoutes(app: FastifyInstance) {
       if (day.status !== 'OPEN') {
         return { ...day, materials: [] };
       }
+      return day;
     }
 
+    await cache.set(cacheKey, day, DAY_TTL);
     return day;
   });
 
@@ -105,6 +124,13 @@ export async function daysRoutes(app: FastifyInstance) {
         opened_by_id: newStatus === 'OPEN' ? request.user!.id : day.opened_by_id,
       },
     });
+
+    // Invalidate caches
+    await Promise.all([
+      cache.del(`cache:day:${id}`),
+      cache.del(`cache:days:${day.cohort_id}`),
+      cache.del('cache:days:all'),
+    ]);
 
     // Notify students via Socket.IO
     const { io } = await import('../../index');
@@ -176,6 +202,7 @@ export async function daysRoutes(app: FastifyInstance) {
       },
     });
 
+    await cache.del(`cache:day:${id}`);
     return reply.status(201).send(material);
   });
 
@@ -194,6 +221,7 @@ export async function daysRoutes(app: FastifyInstance) {
     }
 
     await prisma.material.delete({ where: { id: matId } });
+    await cache.del(`cache:day:${material.day_id}`);
     return { success: true };
   });
 
