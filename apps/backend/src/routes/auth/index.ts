@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../db';
 import { authGuard } from '../../middleware/authGuard';
+import { redis } from '../../redis';
 
 export async function authRoutes(app: FastifyInstance) {
   // POST /api/auth/login
@@ -56,6 +57,20 @@ export async function authRoutes(app: FastifyInstance) {
 
   // POST /api/auth/logout
   app.post('/logout', { preHandler: authGuard }, async (request, reply) => {
+    const token = request.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.decode(token) as { exp?: number } | null;
+        if (decoded?.exp) {
+          const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+          if (ttl > 0) {
+            await redis.set(`blacklist:${token}`, '1', 'EX', ttl);
+          }
+        }
+      } catch {
+        // ignore decode errors — still clear the cookie
+      }
+    }
     reply.clearCookie('token', { path: '/' });
     return { success: true };
   });

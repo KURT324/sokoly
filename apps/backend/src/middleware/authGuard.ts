@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
+import { redis } from '../redis';
 
 export interface JwtPayload {
   userId: string;
@@ -32,6 +33,13 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply) {
     payload = jwt.verify(token, process.env.JWT_SECRET || 'secret') as JwtPayload;
   } catch {
     return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid token' });
+  }
+
+  // Check JWT blacklist (tokens invalidated by logout)
+  const blacklisted = await redis.get(`blacklist:${token}`);
+  if (blacklisted) {
+    reply.clearCookie('token');
+    return reply.status(401).send({ error: 'Unauthorized', message: 'Token has been revoked' });
   }
 
   const user = await prisma.user.findUnique({
