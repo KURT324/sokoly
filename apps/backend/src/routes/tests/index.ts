@@ -515,6 +515,9 @@ export async function testsRoutes(app: FastifyInstance) {
     preHandler: roleGuard(UserRole.STUDENT),
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const test = await prisma.test.findUnique({ where: { id }, select: { cohort_id: true } });
+    if (!test) return reply.status(404).send({ error: 'Not Found' });
+    if (test.cohort_id !== request.user!.cohort_id) return reply.status(403).send({ error: 'Forbidden' });
     const submission = await prisma.testSubmission.findUnique({
       where: { test_id_student_id: { test_id: id, student_id: request.user!.id } },
     });
