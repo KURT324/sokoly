@@ -329,12 +329,13 @@ model DirectChat {
 }
 
 model DirectMessage {
-  id         String   @id @default(uuid())
-  chat_id    String
-  sender_id  String
-  content    String
-  is_read    Boolean  @default(false)
-  created_at DateTime @default(now())
+  id               String   @id @default(uuid())
+  chat_id          String
+  sender_id        String
+  content          String
+  attachments_json Json     @default("[]")
+  is_read          Boolean  @default(false)
+  created_at       DateTime @default(now())
 
   chat   DirectChat @relation(fields: [chat_id], references: [id], onDelete: Cascade)
   sender User       @relation("DirectMessageSender", fields: [sender_id], references: [id])

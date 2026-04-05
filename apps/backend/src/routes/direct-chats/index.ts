@@ -1,11 +1,41 @@
 import { FastifyInstance } from 'fastify';
+import fs from 'fs/promises';
+import fsSync from 'fs';
+import path from 'path';
+import { pipeline } from 'stream/promises';
+import { v4 as uuidv4 } from 'uuid';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../../db';
-import { roleGuard } from '../../middleware/authGuard';
+import { roleGuard, authGuard } from '../../middleware/authGuard';
+
+const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
 const guard = { preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN) };
 
 export async function directChatsRoutes(app: FastifyInstance) {
+  // GET /api/direct-chats/files/:filename — serve attachments
+  app.get('/files/:filename', { preHandler: authGuard }, async (request, reply) => {
+    const { filename } = request.params as { filename: string };
+    const filePath = path.join(STORAGE_PATH, 'chat-files', filename);
+    try {
+      const buf = await fs.readFile(filePath);
+      const ext = path.extname(filename).toLowerCase();
+      const mimeMap: Record<string, string> = {
+        '.pdf': 'application/pdf', '.png': 'image/png',
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      };
+      const mime = mimeMap[ext] ?? 'application/octet-stream';
+      return reply
+        .header('Content-Type', mime)
+        .header('Cache-Control', 'private, max-age=86400')
+        .send(buf);
+    } catch {
+      return reply.status(404).send({ error: 'Not Found' });
+    }
+  });
+
   // GET /api/direct-chats/users — list all other teachers/admins (for new chat)
   app.get('/users', guard, async (request) => {
     const myId = request.user!.id;
@@ -99,15 +129,10 @@ export async function directChatsRoutes(app: FastifyInstance) {
     });
   });
 
-  // POST /api/direct-chats/:id/messages — send message
+  // POST /api/direct-chats/:id/messages — send message (text or multipart with files)
   app.post('/:id/messages', guard, async (request, reply) => {
     const myId = request.user!.id;
     const { id } = request.params as { id: string };
-    const { content } = request.body as { content: string };
-
-    if (!content?.trim()) {
-      return reply.status(400).send({ error: 'content is required' });
-    }
 
     const chat = await prisma.directChat.findUnique({ where: { id } });
     if (!chat) return reply.status(404).send({ error: 'Not Found' });
@@ -115,8 +140,45 @@ export async function directChatsRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'Forbidden' });
     }
 
+    const contentType = request.headers['content-type'] ?? '';
+    let content = '';
+    const attachments: Array<{ filename: string; storage_path: string; mime_type: string; size: number }> = [];
+
+    if (contentType.includes('multipart')) {
+      const parts = request.parts({ limits: { fileSize: 10 * 1024 * 1024 } });
+      for await (const part of parts) {
+        if (part.type === 'field' && part.fieldname === 'content') {
+          content = part.value as string;
+        } else if (part.type === 'file') {
+          await fs.mkdir(path.join(STORAGE_PATH, 'chat-files'), { recursive: true });
+          const ext = path.extname(part.filename).toLowerCase();
+          const storedName = `${uuidv4()}${ext}`;
+          await pipeline(part.file, fsSync.createWriteStream(path.join(STORAGE_PATH, 'chat-files', storedName)));
+          const stat = await fs.stat(path.join(STORAGE_PATH, 'chat-files', storedName));
+          attachments.push({
+            filename: part.filename,
+            storage_path: storedName,
+            mime_type: part.mimetype,
+            size: stat.size,
+          });
+        }
+      }
+    } else {
+      const body = request.body as { content: string };
+      content = body.content ?? '';
+    }
+
+    if (!content.trim() && attachments.length === 0) {
+      return reply.status(400).send({ error: 'content or file required' });
+    }
+
     const message = await prisma.directMessage.create({
-      data: { chat_id: id, sender_id: myId, content: content.trim() },
+      data: {
+        chat_id: id,
+        sender_id: myId,
+        content: content.trim(),
+        attachments_json: attachments,
+      },
       include: { sender: { select: { id: true, callsign: true } } },
     });
 
@@ -130,6 +192,7 @@ export async function directChatsRoutes(app: FastifyInstance) {
         sender_id: message.sender_id,
         sender: message.sender,
         content: message.content,
+        attachments_json: message.attachments_json,
         is_read: message.is_read,
         created_at: message.created_at,
       },

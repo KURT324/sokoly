@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Layout } from '../../components/Layout';
+import { ChatInput } from '../../components/ChatInput';
 import { directChatsApi, DirectChat, DirectMessage, DirectChatUser } from '../../api/directChats';
 import { useAuthStore } from '../../store/authStore';
 import { useSocketEvent } from '../../hooks/useSocket';
@@ -17,6 +18,10 @@ function formatTime(iso: string) {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
 }
 
+function isImage(mime: string) {
+  return mime.startsWith('image/');
+}
+
 export function DirectChatsPage() {
   const user = useAuthStore((s) => s.user);
   const myId = user?.id ?? '';
@@ -25,8 +30,6 @@ export function DirectChatsPage() {
   const [chats, setChats] = useState<DirectChat[]>([]);
   const [selectedChat, setSelectedChat] = useState<DirectChat | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +58,6 @@ export function DirectChatsPage() {
         return [...prev, payload.message];
       });
     }
-    // Update last_message in chat list
     setChats((prev) =>
       prev.map((c) =>
         c.id === payload.chatId
@@ -88,19 +90,13 @@ export function DirectChatsPage() {
     setShowNewChat(false);
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || !selectedChat || sending) return;
-    setSending(true);
-    try {
-      const r = await directChatsApi.sendMessage(selectedChat.id, input.trim());
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === r.data.id)) return prev;
-        return [...prev, r.data];
-      });
-      setInput('');
-    } finally {
-      setSending(false);
-    }
+  const handleSend = async (content: string, files: File[]) => {
+    if (!selectedChat) return;
+    const r = await directChatsApi.sendMessage(selectedChat.id, content, files.length > 0 ? files : undefined);
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === r.data.id)) return prev;
+      return [...prev, r.data];
+    });
   };
 
   return (
@@ -171,7 +167,7 @@ export function DirectChatsPage() {
                   {chat.last_message && (
                     <p className="text-xs text-gray-400 dark:text-slate-500 truncate mt-0.5">
                       {chat.last_message.sender_id === myId ? 'Вы: ' : ''}
-                      {chat.last_message.content}
+                      {chat.last_message.content || '📎 Файл'}
                     </p>
                   )}
                 </button>
@@ -199,18 +195,44 @@ export function DirectChatsPage() {
                   {messages.map((msg) => {
                     const isMe = msg.sender_id === myId;
                     return (
-                      <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                        <div
-                          className={`max-w-[70%] px-3 py-2 rounded-2xl text-sm ${
-                            isMe
-                              ? 'bg-indigo-500 text-white rounded-br-sm'
-                              : 'bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-bl-sm'
-                          }`}
-                        >
-                          <p className="break-words whitespace-pre-wrap">{msg.content}</p>
-                          <p className={`text-[10px] mt-0.5 ${isMe ? 'text-indigo-200' : 'text-gray-400 dark:text-slate-500'} text-right`}>
+                      <div key={msg.id} className={`flex gap-2 mb-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isMe ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-slate-300'}`}>
+                          {msg.sender.callsign.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className={`max-w-xs space-y-1 flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                          {msg.content && (
+                            <div className={`px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words ${
+                              isMe
+                                ? 'bg-indigo-500 text-white rounded-tr-sm'
+                                : 'bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-tl-sm'
+                            }`}>
+                              {msg.content}
+                            </div>
+                          )}
+                          {msg.attachments_json?.map((att, i) => (
+                            <div key={i} className={`rounded-xl overflow-hidden border ${isMe ? 'border-indigo-300' : 'border-gray-200 dark:border-slate-700'}`}>
+                              {isImage(att.mime_type) ? (
+                                <img
+                                  src={directChatsApi.getFileUrl(att.storage_path)}
+                                  alt={att.filename}
+                                  className="max-w-48 max-h-48 object-cover block"
+                                />
+                              ) : (
+                                <a
+                                  href={directChatsApi.getFileUrl(att.storage_path)}
+                                  download={att.filename}
+                                  className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-slate-700/30 hover:bg-gray-100 dark:hover:bg-slate-600 text-sm text-blue-600 dark:text-blue-400"
+                                >
+                                  <span>📎</span>
+                                  <span className="truncate max-w-40">{att.filename}</span>
+                                  <span className="text-gray-400 dark:text-slate-500 text-xs shrink-0">↓</span>
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                          <span className="text-xs text-gray-400 dark:text-slate-500">
                             {formatTime(msg.created_at)}
-                          </p>
+                          </span>
                         </div>
                       </div>
                     );
@@ -218,24 +240,7 @@ export function DirectChatsPage() {
                   <div ref={bottomRef} />
                 </div>
 
-                {/* Input */}
-                <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-700 shrink-0 flex gap-2">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder="Сообщение..."
-                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={!input.trim() || sending}
-                    className="px-4 py-2 text-sm rounded-lg bg-indigo-500 text-white font-medium hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Отправить
-                  </button>
-                </div>
+                <ChatInput chatId={selectedChat.id} onSend={handleSend} />
               </>
             )}
           </div>
