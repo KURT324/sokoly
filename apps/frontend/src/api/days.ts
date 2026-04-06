@@ -62,6 +62,4 @@ export const daysApi = {
   getMaterialViewUrl: (dayId: string, matId: string) =>
     `/api/days/${dayId}/materials/${matId}/view`,
 
-  getActivity: (dayId: string) =>
-    client.get<ActivityLog[]>(`/days/${dayId}/activity`),
 };

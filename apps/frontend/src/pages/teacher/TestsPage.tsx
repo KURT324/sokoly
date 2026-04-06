@@ -1,15 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { testsApi, Test } from '../../api/tests';
-import { ActivityLog } from '../../api/days';
 
 export function TeacherTestsPage() {
   const navigate = useNavigate();
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activityTestId, setActivityTestId] = useState<string | null>(null);
-  const [activityMap, setActivityMap] = useState<Record<string, ActivityLog[]>>({});
 
   useEffect(() => {
     testsApi.getTests().then((r) => setTests(r.data)).finally(() => setLoading(false));
@@ -24,21 +21,6 @@ export function TeacherTestsPage() {
   const handleToggleOpen = async (id: string) => {
     const r = await testsApi.toggleOpen(id);
     setTests((prev) => prev.map((t) => t.id === id ? { ...t, is_open: r.data.is_open } : t));
-    // Refresh activity if currently open for this test
-    if (activityTestId === id) {
-      testsApi.getActivity(id).then((r) => setActivityMap((prev) => ({ ...prev, [id]: r.data })));
-    }
-  };
-
-  const handleToggleActivity = async (id: string) => {
-    if (activityTestId === id) {
-      setActivityTestId(null);
-      return;
-    }
-    setActivityTestId(id);
-    if (!activityMap[id]) {
-      testsApi.getActivity(id).then((r) => setActivityMap((prev) => ({ ...prev, [id]: r.data })));
-    }
   };
 
   return (
@@ -73,8 +55,7 @@ export function TeacherTestsPage() {
               </thead>
               <tbody>
                 {tests.map((test) => (
-                  <React.Fragment key={test.id}>
-                  <tr className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                  <tr key={test.id} className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">{test.title}</td>
                     <td className="px-4 py-3 text-gray-500 dark:text-slate-400">{test.cohort?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 dark:text-slate-400">
@@ -103,12 +84,6 @@ export function TeacherTestsPage() {
                           Результаты
                         </Link>
                         <button
-                          onClick={() => handleToggleActivity(test.id)}
-                          className="text-gray-500 dark:text-slate-400 hover:text-gray-700 text-xs font-medium"
-                        >
-                          История
-                        </button>
-                        <button
                           onClick={() => handleDelete(test.id, test.title)}
                           className="text-red-500 hover:text-red-700 text-xs font-medium"
                         >
@@ -117,31 +92,6 @@ export function TeacherTestsPage() {
                       </div>
                     </td>
                   </tr>
-                  {activityTestId === test.id && (
-                    <tr className="bg-gray-50 dark:bg-slate-700/30">
-                      <td colSpan={6} className="px-4 py-3">
-                        {!activityMap[test.id] ? (
-                          <span className="text-xs text-gray-400 dark:text-slate-500">Загрузка...</span>
-                        ) : activityMap[test.id].length === 0 ? (
-                          <span className="text-xs text-gray-400 dark:text-slate-500">История пуста</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-x-6 gap-y-1">
-                            {activityMap[test.id].map((log) => (
-                              <div key={log.id} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-slate-300">
-                                <span className={`w-1.5 h-1.5 rounded-full ${log.action === 'OPENED' ? 'bg-green-500' : 'bg-gray-400'}`} />
-                                <span>{log.action === 'OPENED' ? 'Открыт' : 'Закрыт'}</span>
-                                <span className="text-gray-400 dark:text-slate-500">— {log.actor.callsign}</span>
-                                <span className="text-gray-400 dark:text-slate-500">
-                                  {new Date(log.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>
                 ))}
               </tbody>
             </table>
