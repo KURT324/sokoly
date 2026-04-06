@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { testsApi, Test } from '../../api/tests';
@@ -73,7 +73,8 @@ export function TeacherTestsPage() {
               </thead>
               <tbody>
                 {tests.map((test) => (
-                  <tr key={test.id} className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                  <React.Fragment key={test.id}>
+                  <tr className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">{test.title}</td>
                     <td className="px-4 py-3 text-gray-500 dark:text-slate-400">{test.cohort?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 dark:text-slate-400">
@@ -140,6 +141,7 @@ export function TeacherTestsPage() {
                       </td>
                     </tr>
                   )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
