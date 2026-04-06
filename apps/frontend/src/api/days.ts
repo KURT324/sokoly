@@ -1,6 +1,15 @@
 import client from './client';
 import { DayStatus, MaterialType } from '@eduplatform/shared';
 
+export interface ActivityLog {
+  id: string;
+  entity_type: 'DAY' | 'TEST';
+  entity_id: string;
+  action: 'OPENED' | 'CLOSED';
+  actor: { id: string; callsign: string };
+  created_at: string;
+}
+
 export interface DayRecord {
   id: string;
   day_number: number;
@@ -52,4 +61,7 @@ export const daysApi = {
 
   getMaterialViewUrl: (dayId: string, matId: string) =>
     `/api/days/${dayId}/materials/${matId}/view`,
+
+  getActivity: (dayId: string) =>
+    client.get<ActivityLog[]>(`/days/${dayId}/activity`),
 };

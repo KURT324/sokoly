@@ -187,7 +187,28 @@ export async function testsRoutes(app: FastifyInstance) {
       data: { is_open: !test.is_open },
       select: { id: true, is_open: true },
     });
+    await prisma.activityLog.create({
+      data: {
+        entity_type: 'TEST',
+        entity_id: id,
+        action: !test.is_open ? 'OPENED' : 'CLOSED',
+        actor_id: request.user!.id,
+      },
+    });
     return updated;
+  });
+
+  // GET /api/tests/:id/activity — toggle history
+  app.get('/:id/activity', { preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN) }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const test = await prisma.test.findUnique({ where: { id }, select: { id: true } });
+    if (!test) return reply.status(404).send({ error: 'Not Found' });
+
+    return prisma.activityLog.findMany({
+      where: { entity_type: 'TEST', entity_id: id },
+      include: { actor: { select: { id: true, callsign: true } } },
+      orderBy: { created_at: 'desc' },
+    });
   });
 
   // GET /api/tests — list

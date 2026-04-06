@@ -111,6 +111,7 @@ export const testsApi = {
   updateTest: (id: string, data: any) => client.put<Test>(`/tests/${id}`, data),
   deleteTest: (id: string) => client.delete(`/tests/${id}`),
   toggleOpen: (id: string) => client.patch<{ id: string; is_open: boolean }>(`/tests/${id}/toggle-open`),
+  getActivity: (id: string) => client.get<import('./days').ActivityLog[]>(`/tests/${id}/activity`),
 
   submitTest: (id: string, answers: any[], variant_id: string) =>
     client.post<SubmitResult>(`/tests/${id}/submit`, { answers, variant_id }),

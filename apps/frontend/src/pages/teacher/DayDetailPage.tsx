@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { daysApi, DayRecord, MaterialRecord } from '../../api/days';
+import { daysApi, DayRecord, MaterialRecord, ActivityLog } from '../../api/days';
 import { materialLibraryApi, LibraryItem } from '../../api/materialLibrary';
 import { MaterialType } from '@eduplatform/shared';
 import { Layout } from '../../components/Layout';
@@ -33,6 +33,7 @@ export function TeacherDayDetailPage() {
   const [linkTitle, setLinkTitle] = useState('');
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
+  const [activity, setActivity] = useState<ActivityLog[]>([]);
 
   // Inline preview
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export function TeacherDayDetailPage() {
       setDay(r.data);
       setMaterials(r.data.materials ?? []);
     });
+    daysApi.getActivity(dayId).then((r) => setActivity(r.data)).catch(() => {});
   };
 
   useEffect(() => { load(); }, [dayId]);
@@ -391,6 +393,33 @@ export function TeacherDayDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Activity log */}
+        {activity.length > 0 && (
+          <div className="mt-6 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-slate-200">История открытий</h2>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-slate-700">
+              {activity.map((log) => (
+                <div key={log.id} className="flex items-center justify-between px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${log.action === 'OPENED' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    <span className="text-sm text-gray-700 dark:text-slate-200">
+                      {log.action === 'OPENED' ? 'Открыт' : 'Закрыт'}
+                    </span>
+                    <span className="text-sm text-gray-400 dark:text-slate-500">
+                      — {log.actor.callsign}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">
+                    {new Date(log.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Library modal */}

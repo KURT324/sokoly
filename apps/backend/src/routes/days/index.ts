@@ -125,6 +125,16 @@ export async function daysRoutes(app: FastifyInstance) {
       },
     });
 
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        entity_type: 'DAY',
+        entity_id: id,
+        action: newStatus === 'OPEN' ? 'OPENED' : 'CLOSED',
+        actor_id: request.user!.id,
+      },
+    });
+
     // Invalidate caches
     await Promise.all([
       cache.del(`cache:day:${id}`),
@@ -223,6 +233,19 @@ export async function daysRoutes(app: FastifyInstance) {
     await prisma.material.delete({ where: { id: matId } });
     await cache.del(`cache:day:${material.day_id}`);
     return { success: true };
+  });
+
+  // GET /api/days/:id/activity — toggle history
+  app.get('/:id/activity', { preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN) }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const day = await prisma.day.findUnique({ where: { id }, select: { id: true } });
+    if (!day) return reply.status(404).send({ error: 'Not Found' });
+
+    return prisma.activityLog.findMany({
+      where: { entity_type: 'DAY', entity_id: id },
+      include: { actor: { select: { id: true, callsign: true } } },
+      orderBy: { created_at: 'desc' },
+    });
   });
 
   // GET /api/days/:id/materials/:matId/view — protected file with watermark

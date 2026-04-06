@@ -48,6 +48,16 @@ enum ChatType {
   STUDENT_ADMIN
 }
 
+enum ActivityEntity {
+  DAY
+  TEST
+}
+
+enum ActivityAction {
+  OPENED
+  CLOSED
+}
+
 model User {
   id                   String    @id @default(uuid())
   email                String    @unique
@@ -75,6 +85,7 @@ model User {
   direct_chats_as_user1  DirectChat[]            @relation("DirectChatUser1")
   direct_chats_as_user2  DirectChat[]            @relation("DirectChatUser2")
   sent_direct_messages   DirectMessage[]         @relation("DirectMessageSender")
+  activity_logs          ActivityLog[]           @relation("ActivityActor")
 
   @@map("users")
 }
@@ -341,6 +352,20 @@ model DirectMessage {
   sender User       @relation("DirectMessageSender", fields: [sender_id], references: [id])
 
   @@map("direct_messages")
+}
+
+model ActivityLog {
+  id          String         @id @default(uuid())
+  entity_type ActivityEntity
+  entity_id   String
+  action      ActivityAction
+  actor_id    String
+  created_at  DateTime       @default(now())
+
+  actor User @relation("ActivityActor", fields: [actor_id], references: [id], onDelete: Cascade)
+
+  @@index([entity_type, entity_id])
+  @@map("activity_logs")
 }
 
 model ChatMessage {
