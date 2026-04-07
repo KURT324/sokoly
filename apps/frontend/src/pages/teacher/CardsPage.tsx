@@ -39,16 +39,25 @@ const STATUS_COLORS: Record<CardTaskStatus, string> = {
 };
 
 // ─── Draggable card tile ──────────────────────────────────────────────────────
+const ASSIGN_STATUS_BADGE: Partial<Record<CardTaskStatus, { label: string; cls: string }>> = {
+  COMPLETED:       { label: '✓ Выполнено',  cls: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
+  PENDING:         { label: '⏳ Ожидает',    cls: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
+  AWAITING_REVIEW: { label: '⏳ Ожидает',    cls: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
+  RETURNED:        { label: '↩ Возвращено', cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
+};
+
 function DraggableCard({
   card,
   onAssign,
   onDelete,
   isAssignTarget,
+  assignmentStatus,
 }: {
   card: CardLibrary;
   onAssign: (card: CardLibrary) => void;
   onDelete: (card: CardLibrary) => void;
   isAssignTarget: boolean;
+  assignmentStatus?: CardTaskStatus | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `card-${card.id}`,
@@ -81,7 +90,14 @@ function DraggableCard({
         />
       </div>
       <div className="p-3 space-y-2">
-        <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">{card.title}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">{card.title}</p>
+          {assignmentStatus && ASSIGN_STATUS_BADGE[assignmentStatus] && (
+            <span className={`shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full ${ASSIGN_STATUS_BADGE[assignmentStatus]!.cls}`}>
+              {ASSIGN_STATUS_BADGE[assignmentStatus]!.label}
+            </span>
+          )}
+        </div>
         <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-2">{card.instructions}</p>
         <div className="flex gap-2 pt-1">
           <button
@@ -411,6 +427,15 @@ export function TeacherCardsPage() {
     .filter((t) => studentFilter === 'ALL' || t.student_id === studentFilter);
   const pendingCount = assignments.filter((t) => t.status === 'AWAITING_REVIEW').length;
 
+  // Map library_id → status for currently selected student (used to show badges in library grid)
+  const studentCardStatusMap: Record<string, CardTaskStatus> = assignStudentId
+    ? Object.fromEntries(
+        assignments
+          .filter((t) => t.student_id === assignStudentId && t.library_id)
+          .map((t) => [t.library_id!, t.status])
+      )
+    : {};
+
   // Stats (over all assignments, ignoring filters)
   const statsTotal = assignments.length;
   const statsCompleted = assignments.filter((t) => t.status === 'COMPLETED').length;
@@ -625,6 +650,7 @@ export function TeacherCardsPage() {
                           onAssign={openAssign}
                           onDelete={handleDeleteCard}
                           isAssignTarget={assignCard?.id === card.id}
+                          assignmentStatus={studentCardStatusMap[card.id] ?? null}
                         />
                       ))}
 
