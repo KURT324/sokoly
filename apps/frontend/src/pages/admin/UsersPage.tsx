@@ -15,6 +15,7 @@ export function AdminUsersPage() {
   const [filterRole, setFilterRole] = useState('');
   const [filterCohort, setFilterCohort] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [resetTarget, setResetTarget] = useState<UserRecord | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUsers = () => {
@@ -129,7 +130,13 @@ export function AdminUsersPage() {
                     <td className="px-4 py-3 text-gray-500 dark:text-slate-400">
                       {new Date(u.created_at).toLocaleDateString('ru-RU')}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center gap-3">
+                      <button
+                        onClick={() => setResetTarget(u)}
+                        className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                      >
+                        Сменить пароль
+                      </button>
                       <button
                         onClick={() => handleDelete(u.id, u.callsign)}
                         className="text-red-500 hover:text-red-700 text-xs font-medium"
@@ -157,6 +164,13 @@ export function AdminUsersPage() {
           cohorts={cohorts}
           onClose={() => setShowModal(false)}
           onCreated={() => { setShowModal(false); fetchUsers(); }}
+        />
+      )}
+
+      {resetTarget && (
+        <ResetPasswordModal
+          user={resetTarget}
+          onClose={() => setResetTarget(null)}
         />
       )}
     </Layout>
@@ -290,6 +304,96 @@ function CreateUserModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordModal({
+  user,
+  onClose,
+}: {
+  user: UserRecord;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await adminApi.resetPassword(user.id, password);
+      setDone(true);
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message || 'Ошибка смены пароля';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-1">Сменить пароль</h2>
+        <p className="text-sm text-gray-500 dark:text-slate-400 mb-5">{user.callsign} ({user.email})</p>
+
+        {done ? (
+          <div className="space-y-4">
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg px-4 py-3 text-sm">
+              Пароль успешно изменён
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+            >
+              Закрыть
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Field label="Новый пароль">
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputCls}
+                placeholder="Минимум 6 символов"
+                autoFocus
+              />
+            </Field>
+
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg px-4 py-3 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              >
+                {loading ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

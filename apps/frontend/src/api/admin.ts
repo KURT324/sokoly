@@ -41,6 +41,9 @@ export const adminApi = {
 
   deleteUser: (id: string) => client.delete(`/admin/users/${id}`),
 
+  resetPassword: (id: string, password: string) =>
+    client.patch(`/admin/users/${id}/password`, { password }),
+
   // Cohorts
   getCohorts: () => client.get<CohortRecord[]>('/admin/cohorts'),
 

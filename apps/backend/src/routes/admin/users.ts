@@ -133,6 +133,27 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     return updated;
   });
 
+  // PATCH /api/admin/users/:id/password
+  app.patch('/:id/password', adminOnly, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { password } = request.body as { password?: string };
+
+    if (!password || password.length < 6) {
+      return reply.status(400).send({ error: 'Bad Request', message: 'password must be at least 6 characters' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return reply.status(404).send({ error: 'Not Found' });
+
+    const password_hash = await bcrypt.hash(password, 12);
+    await prisma.user.update({
+      where: { id },
+      data: { password_hash, must_change_password: false },
+    });
+
+    return { success: true };
+  });
+
   // DELETE /api/admin/users/:id
   app.delete('/:id', adminOnly, async (request, reply) => {
     const { id } = request.params as { id: string };
