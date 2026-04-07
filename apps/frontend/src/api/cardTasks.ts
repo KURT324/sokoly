@@ -82,6 +82,9 @@ export const cardTasksApi = {
   assignTask: (library_id: string, student_id: string, instructions?: string) =>
     client.post<CardTask>('/card-tasks', { library_id, student_id, instructions }),
 
+  bulkAssign: (library_ids: string[], student_ids: string[]) =>
+    client.post<{ created: number; skipped: number }>('/card-tasks/bulk-assign', { library_ids, student_ids }),
+
   getMyTasks: () => client.get<CardTask[]>('/card-tasks/my'),
   getAllAssignments: (status?: string) =>
     client.get<CardTask[]>('/card-tasks', { params: status ? { status } : undefined }),

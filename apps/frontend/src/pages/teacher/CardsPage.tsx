@@ -52,12 +52,18 @@ function DraggableCard({
   onDelete,
   isAssignTarget,
   assignmentStatus,
+  bulkMode,
+  bulkSelected,
+  onBulkToggle,
 }: {
   card: CardLibrary;
   onAssign: (card: CardLibrary) => void;
   onDelete: (card: CardLibrary) => void;
   isAssignTarget: boolean;
   assignmentStatus?: CardTaskStatus | null;
+  bulkMode?: boolean;
+  bulkSelected?: boolean;
+  onBulkToggle?: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `card-${card.id}`,
@@ -74,14 +80,31 @@ function DraggableCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-white dark:bg-slate-800 border rounded-xl overflow-hidden transition-all ${
-        isAssignTarget
-          ? 'border-blue-400 dark:border-blue-600 shadow-md'
-          : 'border-gray-200 dark:border-slate-700'
+      onClick={bulkMode ? () => onBulkToggle?.(card.id) : undefined}
+      className={`relative bg-white dark:bg-slate-800 border rounded-xl overflow-hidden transition-all ${
+        bulkMode
+          ? bulkSelected
+            ? 'border-violet-500 dark:border-violet-500 shadow-md ring-2 ring-violet-400 cursor-pointer'
+            : 'border-gray-200 dark:border-slate-700 cursor-pointer hover:border-violet-300'
+          : isAssignTarget
+            ? 'border-blue-400 dark:border-blue-600 shadow-md'
+            : 'border-gray-200 dark:border-slate-700'
       }`}
     >
+      {/* Bulk checkbox overlay */}
+      {bulkMode && (
+        <div className="absolute top-2 left-2 z-10 pointer-events-none">
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+            bulkSelected
+              ? 'bg-violet-600 border-violet-600'
+              : 'bg-white dark:bg-slate-700 border-gray-400 dark:border-slate-500'
+          }`}>
+            {bulkSelected && <span className="text-white text-xs leading-none">✓</span>}
+          </div>
+        </div>
+      )}
       {/* Drag handle = image */}
-      <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing">
+      <div {...listeners} {...attributes} className={bulkMode ? 'pointer-events-none' : 'cursor-grab active:cursor-grabbing'}>
         <img
           src={cardTasksApi.getImageUrl(card.image_path)}
           alt={card.title}
@@ -99,20 +122,22 @@ function DraggableCard({
           )}
         </div>
         <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-2">{card.instructions}</p>
-        <div className="flex gap-2 pt-1">
-          <button
-            onClick={() => onAssign(card)}
-            className="flex-1 text-xs py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Назначить
-          </button>
-          <button
-            onClick={() => onDelete(card)}
-            className="text-xs py-1.5 px-2 text-red-500 hover:text-red-700 border border-red-200 dark:border-red-800 rounded-lg transition-colors"
-          >
-            ✕
-          </button>
-        </div>
+        {!bulkMode && (
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => onAssign(card)}
+              className="flex-1 text-xs py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            >
+              Назначить
+            </button>
+            <button
+              onClick={() => onDelete(card)}
+              className="text-xs py-1.5 px-2 text-red-500 hover:text-red-700 border border-red-200 dark:border-red-800 rounded-lg transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -228,6 +253,13 @@ export function TeacherCardsPage() {
   const [assigningFolder, setAssigningFolder] = useState(false);
   const [assignFolderMsg, setAssignFolderMsg] = useState('');
 
+  // Bulk assign mode
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkCards, setBulkCards] = useState<Set<string>>(new Set());
+  const [bulkStudents, setBulkStudents] = useState<Set<string>>(new Set());
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState('');
+
   // Assignments tab
   const [assignments, setAssignments] = useState<CardTask[]>([]);
   const [loadingAssign, setLoadingAssign] = useState(true);
@@ -336,6 +368,23 @@ export function TeacherCardsPage() {
       setAssignMsg('Назначено!'); setAssignStudentId(''); loadAssignments();
     } catch { setAssignMsg('Ошибка назначения'); }
     finally { setAssigning(false); }
+  };
+
+  const handleBulkAssign = async () => {
+    if (bulkCards.size === 0 || bulkStudents.size === 0) return;
+    setBulkAssigning(true);
+    setBulkMsg('');
+    try {
+      const res = await cardTasksApi.bulkAssign([...bulkCards], [...bulkStudents]);
+      setBulkMsg(`Создано: ${res.data.created}, пропущено (уже назначено): ${res.data.skipped}`);
+      setBulkCards(new Set());
+      setBulkStudents(new Set());
+      loadAssignments();
+    } catch {
+      setBulkMsg('Ошибка назначения');
+    } finally {
+      setBulkAssigning(false);
+    }
   };
 
   // ── Assign whole folder ─────────────────────────────────────────────────────
@@ -535,6 +584,23 @@ export function TeacherCardsPage() {
                   )}
 
                   <button
+                    onClick={() => {
+                      setBulkMode((v) => !v);
+                      setBulkCards(new Set());
+                      setBulkStudents(new Set());
+                      setBulkMsg('');
+                      setAssignCard(null);
+                      setAssignFolderTarget(null);
+                    }}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors border ${
+                      bulkMode
+                        ? 'bg-violet-600 hover:bg-violet-700 text-white border-violet-600'
+                        : 'border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                    }`}
+                  >
+                    {bulkMode ? '✕ Выйти из режима' : '☑ Режим назначения'}
+                  </button>
+                  <button
                     onClick={() => { setShowUpload((v) => !v); setUploadError(''); }}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
@@ -621,6 +687,69 @@ export function TeacherCardsPage() {
                 </div>
               )}
 
+              {/* ── Bulk mode: student selector + action bar ── */}
+              {bulkMode && (
+                <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="text-sm font-medium text-violet-800 dark:text-violet-300">
+                      Выберите карточки и курсантов, затем нажмите «Назначить»
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {bulkMsg && (
+                        <span className={`text-xs ${bulkMsg.startsWith('Ошибка') ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}>
+                          {bulkMsg}
+                        </span>
+                      )}
+                      <button
+                        onClick={handleBulkAssign}
+                        disabled={bulkAssigning || bulkCards.size === 0 || bulkStudents.size === 0}
+                        className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        {bulkAssigning
+                          ? 'Назначение...'
+                          : `Назначить выбранные (${bulkCards.size} × ${bulkStudents.size})`}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Student checkboxes */}
+                  <div>
+                    <p className="text-xs font-medium text-violet-700 dark:text-violet-400 mb-2">
+                      Курсанты ({bulkStudents.size} выбрано):
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {cohortStudents.length === 0 && (
+                        <span className="text-xs text-gray-400 dark:text-slate-500">Нет курсантов в группе</span>
+                      )}
+                      {cohortStudents.map((s) => {
+                        const checked = bulkStudents.has(s.id);
+                        return (
+                          <label key={s.id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border cursor-pointer text-sm transition-colors select-none ${
+                            checked
+                              ? 'bg-violet-600 border-violet-600 text-white'
+                              : 'bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:border-violet-400'
+                          }`}>
+                            <input
+                              type="checkbox"
+                              className="hidden"
+                              checked={checked}
+                              onChange={() => {
+                                setBulkStudents((prev) => {
+                                  const next = new Set(prev);
+                                  checked ? next.delete(s.id) : next.add(s.id);
+                                  return next;
+                                });
+                              }}
+                            />
+                            {s.callsign}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Grid + Assign panel */}
               <div className="flex gap-6">
                 <div className="flex-1">
@@ -651,6 +780,13 @@ export function TeacherCardsPage() {
                           onDelete={handleDeleteCard}
                           isAssignTarget={assignCard?.id === card.id}
                           assignmentStatus={studentCardStatusMap[card.id] ?? null}
+                          bulkMode={bulkMode}
+                          bulkSelected={bulkCards.has(card.id)}
+                          onBulkToggle={(id) => setBulkCards((prev) => {
+                            const next = new Set(prev);
+                            prev.has(id) ? next.delete(id) : next.add(id);
+                            return next;
+                          })}
                         />
                       ))}
 

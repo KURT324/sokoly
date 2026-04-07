@@ -144,6 +144,50 @@ export async function cardTasksRoutes(app: FastifyInstance) {
 
   // ── Assignments ───────────────────────────────────────────────────────────────
 
+  // POST /api/card-tasks/bulk-assign
+  app.post('/bulk-assign', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const { library_ids, student_ids } = request.body as {
+      library_ids: string[];
+      student_ids: string[];
+    };
+
+    if (!Array.isArray(library_ids) || !Array.isArray(student_ids) || library_ids.length === 0 || student_ids.length === 0) {
+      return reply.status(400).send({ error: 'library_ids and student_ids must be non-empty arrays' });
+    }
+
+    const libCards = await prisma.cardLibrary.findMany({ where: { id: { in: library_ids } } });
+    const libMap = new Map(libCards.map((c) => [c.id, c]));
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const student_id of student_ids) {
+      for (const library_id of library_ids) {
+        const libCard = libMap.get(library_id);
+        if (!libCard) { skipped++; continue; }
+
+        const existing = await prisma.cardTask.findFirst({ where: { student_id, library_id } });
+        if (existing) { skipped++; continue; }
+
+        await prisma.cardTask.create({
+          data: {
+            student_id,
+            library_id,
+            image_path: libCard.image_path,
+            instructions: libCard.instructions,
+            created_by_id: request.user!.id,
+            status: CardTaskStatus.PENDING,
+          },
+        });
+        created++;
+      }
+    }
+
+    return reply.status(201).send({ created, skipped });
+  });
+
   // POST /api/card-tasks — assign library card to student (JSON body)
   app.post('/', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
