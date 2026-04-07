@@ -138,6 +138,51 @@ export async function materialLibraryRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
+  // POST /api/material-library/attach-folder — attach all items in a folder to a day
+  app.post('/attach-folder', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const { folder, day_id } = request.body as { folder: string | null; day_id: string };
+
+    if (!day_id) return reply.status(400).send({ error: 'day_id required' });
+
+    const day = await prisma.day.findUnique({ where: { id: day_id } });
+    if (!day) return reply.status(404).send({ error: 'Day not found' });
+
+    const items = await prisma.materialLibrary.findMany({
+      where: { folder: folder === '' ? null : (folder ?? null) },
+    });
+
+    if (items.length === 0) return reply.status(400).send({ error: 'No items in folder' });
+
+    let count = 0;
+    for (const item of items) {
+      let newStoragePath: string | null = null;
+      if (item.storage_path) {
+        const srcPath = path.join(STORAGE_PATH, item.storage_path);
+        const ext = path.extname(item.storage_path);
+        const destName = `${uuidv4()}${ext}`;
+        const destPath = path.join(STORAGE_PATH, destName);
+        await fs.copyFile(srcPath, destPath).catch(() => {});
+        newStoragePath = destName;
+      }
+      await prisma.material.create({
+        data: {
+          day_id,
+          library_id: item.id,
+          type: item.type,
+          title: item.title,
+          storage_path: newStoragePath,
+          url: item.url,
+          size_bytes: item.size_bytes,
+        },
+      });
+      count++;
+    }
+
+    return reply.status(201).send({ count });
+  });
+
   // POST /api/material-library/:id/attach — copy item to a day
   app.post('/:id/attach', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),

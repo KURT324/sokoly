@@ -39,6 +39,9 @@ export const materialLibraryApi = {
   renameFolder: (oldName: string, newName: string) =>
     client.patch('/material-library/rename-folder', { oldName, newName }),
 
+  attachFolder: (folder: string, day_id: string) =>
+    client.post<{ count: number }>('/material-library/attach-folder', { folder, day_id }),
+
   attachToDay: (libId: string, dayId: string) =>
     client.post<MaterialRecord>(`/material-library/${libId}/attach`, { day_id: dayId }),
 

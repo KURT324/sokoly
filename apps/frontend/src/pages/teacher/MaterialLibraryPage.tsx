@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Layout } from '../../components/Layout';
 import { materialLibraryApi, LibraryItem } from '../../api/materialLibrary';
+import { cohortsApi, Cohort } from '../../api/cohorts';
 import { MaterialType } from '@eduplatform/shared';
 
 const TYPE_ICONS: Record<MaterialType, string> = {
@@ -45,6 +46,14 @@ export function MaterialLibraryPage() {
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
 
+  // Attach folder to day
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [attachCohortId, setAttachCohortId] = useState('');
+  const [attachDayId, setAttachDayId] = useState('');
+  const [attaching, setAttaching] = useState(false);
+  const [attachMsg, setAttachMsg] = useState('');
+
   // Inline preview state
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [docHtmlCache, setDocHtmlCache] = useState<Record<string, string>>({});
@@ -63,7 +72,13 @@ export function MaterialLibraryPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    cohortsApi.getCohorts().then((r) => {
+      setCohorts(r.data);
+      if (r.data.length > 0) setAttachCohortId(r.data[0].id);
+    });
+  }, []);
 
   // Pre-fill upload folder when entering a folder
   useEffect(() => {
@@ -169,6 +184,21 @@ export function MaterialLibraryPage() {
       setRenaming(false);
       setRenamingFolder(null);
       setRenameValue('');
+    }
+  };
+
+  const handleAttachFolder = async () => {
+    if (!attachDayId || openFolder === null) return;
+    setAttaching(true);
+    setAttachMsg('');
+    try {
+      const res = await materialLibraryApi.attachFolder(openFolder, attachDayId);
+      setAttachMsg(`Добавлено ${res.data.count} файлов в день`);
+      setAttachDayId('');
+    } catch {
+      setAttachMsg('Ошибка при добавлении');
+    } finally {
+      setAttaching(false);
     }
   };
 
@@ -385,7 +415,13 @@ export function MaterialLibraryPage() {
               <span className="text-sm font-semibold text-gray-800 dark:text-slate-100">
                 📂 {openFolder || 'Без папки'}
               </span>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => { setShowAttachModal(true); setAttachMsg(''); }}
+                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
+                >
+                  📥 Добавить всё в день
+                </button>
                 <input
                   type="text"
                   placeholder="Поиск по названию..."
@@ -481,6 +517,73 @@ export function MaterialLibraryPage() {
           </div>
         )}
       </div>
+
+      {/* Attach folder to day modal */}
+      {showAttachModal && openFolder !== null && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">Добавить всё в день</h2>
+              <button onClick={() => setShowAttachModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-xl leading-none">×</button>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              📂 {openFolder || 'Без папки'} — {visibleItems.length} файлов
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Группа</label>
+                <select
+                  value={attachCohortId}
+                  onChange={(e) => { setAttachCohortId(e.target.value); setAttachDayId(''); }}
+                  className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {cohorts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">День</label>
+                <select
+                  value={attachDayId}
+                  onChange={(e) => setAttachDayId(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Выберите день...</option>
+                  {(cohorts.find((c) => c.id === attachCohortId)?.days ?? [])
+                    .slice()
+                    .sort((a, b) => a.day_number - b.day_number)
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>День {d.day_number}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            {attachMsg && (
+              <p className={`text-sm ${attachMsg.startsWith('Ошибка') ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}>
+                {attachMsg}
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowAttachModal(false)}
+                className="flex-1 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 text-sm font-medium py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+              >
+                Закрыть
+              </button>
+              <button
+                onClick={handleAttachFolder}
+                disabled={attaching || !attachDayId}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              >
+                {attaching ? 'Добавление...' : 'Добавить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
