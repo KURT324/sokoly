@@ -87,6 +87,11 @@ export function MaterialLibraryPage() {
       .sort(([a], [b]) => {
         if (a === '' && b !== '') return 1;
         if (a !== '' && b === '') return -1;
+        const numA = parseInt(a.match(/\d+/)?.[0] ?? '', 10);
+        const numB = parseInt(b.match(/\d+/)?.[0] ?? '', 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        if (!isNaN(numA)) return -1;
+        if (!isNaN(numB)) return 1;
         return a.localeCompare(b, 'ru');
       })
       .map(([name, count]) => ({ name, count }));
