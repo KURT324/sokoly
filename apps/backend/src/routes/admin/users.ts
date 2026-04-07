@@ -176,13 +176,20 @@ export async function adminUsersRoutes(app: FastifyInstance) {
       await tx.testSubmission.deleteMany({ where: { student_id: id } });
       // 4. ChatMessage (sender_id FK, no cascade)
       await tx.chatMessage.deleteMany({ where: { sender_id: id } });
-      // 4b. DirectMessage sent by user (cascade would handle chat deletion but sender_id FK has no cascade)
-      await tx.directMessage.deleteMany({ where: { sender_id: id } });
-      // 4c. DirectChat (user1_id/user2_id FKs have CASCADE in migration but Prisma schema doesn't declare it — be explicit)
+      // 5. DirectMessage — all messages in chats where user is a participant
+      const directChats = await tx.directChat.findMany({
+        where: { OR: [{ user1_id: id }, { user2_id: id }] },
+        select: { id: true },
+      });
+      const directChatIds = directChats.map((c) => c.id);
+      await tx.directMessage.deleteMany({ where: { chat_id: { in: directChatIds } } });
+      // 6. DirectChat (user1_id/user2_id FKs, no cascade)
       await tx.directChat.deleteMany({ where: { OR: [{ user1_id: id }, { user2_id: id }] } });
-      // 5. TestVariantAssignment (has onDelete: Cascade but be explicit)
+      // 7. ActivityLog (actor_id FK, no cascade)
+      await tx.activityLog.deleteMany({ where: { actor_id: id } });
+      // 8. TestVariantAssignment (has onDelete: Cascade but be explicit)
       await tx.testVariantAssignment.deleteMany({ where: { student_id: id } });
-      // 6. User
+      // 9. User
       await tx.user.delete({ where: { id } });
     });
 
