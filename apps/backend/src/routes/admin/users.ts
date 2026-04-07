@@ -4,6 +4,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../../db';
 import { roleGuard } from '../../middleware/authGuard';
+import fs from 'fs/promises';
+import path from 'path';
+
+const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
 export async function adminUsersRoutes(app: FastifyInstance) {
   const adminOnly = { preHandler: roleGuard(UserRole.ADMIN) };
@@ -187,9 +191,20 @@ export async function adminUsersRoutes(app: FastifyInstance) {
       await tx.directChat.deleteMany({ where: { OR: [{ user1_id: id }, { user2_id: id }] } });
       // 7. ActivityLog (actor_id FK, no cascade)
       await tx.activityLog.deleteMany({ where: { actor_id: id } });
-      // 8. TestVariantAssignment (has onDelete: Cascade but be explicit)
+      // 8. MaterialLibrary — delete files from storage first, then DB records
+      const libItems = await tx.materialLibrary.findMany({
+        where: { created_by_id: id },
+        select: { storage_path: true },
+      });
+      await tx.materialLibrary.deleteMany({ where: { created_by_id: id } });
+      for (const item of libItems) {
+        if (item.storage_path) {
+          await fs.unlink(path.join(STORAGE_PATH, item.storage_path)).catch(() => null);
+        }
+      }
+      // 9. TestVariantAssignment (has onDelete: Cascade but be explicit)
       await tx.testVariantAssignment.deleteMany({ where: { student_id: id } });
-      // 9. User
+      // 10. User
       await tx.user.delete({ where: { id } });
     }); } catch (error) {
       console.error('Delete user error:', error);
