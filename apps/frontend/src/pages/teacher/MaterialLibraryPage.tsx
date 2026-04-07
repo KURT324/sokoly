@@ -38,6 +38,13 @@ export function MaterialLibraryPage() {
   const load = () =>
     materialLibraryApi.getLibrary().then((r) => setItems(r.data)).finally(() => setLoading(false));
 
+  // Navigation / search / rename
+  const [openFolder, setOpenFolder] = useState<string | null>(null); // null = root grid
+  const [search, setSearch] = useState('');
+  const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renaming, setRenaming] = useState(false);
+
   // Inline preview state
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [docHtmlCache, setDocHtmlCache] = useState<Record<string, string>>({});
@@ -58,30 +65,40 @@ export function MaterialLibraryPage() {
 
   useEffect(() => { load(); }, []);
 
+  // Pre-fill upload folder when entering a folder
+  useEffect(() => {
+    if (openFolder !== null) setUploadFolder(openFolder);
+  }, [openFolder]);
+
   // Collect all unique folder names for autocomplete suggestions
   const allFolders = useMemo(
     () => [...new Set(items.map((i) => i.folder).filter(Boolean) as string[])].sort(),
     [items],
   );
 
-  // Group items: folder → items[], null folder → 'Без папки'
-  const grouped = useMemo(() => {
-    const map = new Map<string, LibraryItem[]>();
+  // Folder list with file counts for root grid
+  const folderList = useMemo(() => {
+    const map = new Map<string, number>();
     for (const item of items) {
-      const key = item.folder || '';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(item);
+      const key = item.folder ?? '';
+      map.set(key, (map.get(key) ?? 0) + 1);
     }
-    // Sort: named folders first (alphabetically), then ungrouped
-    const entries: [string, LibraryItem[]][] = [];
-    const sorted = [...map.keys()].sort((a, b) => {
-      if (a === '' && b !== '') return 1;
-      if (a !== '' && b === '') return -1;
-      return a.localeCompare(b, 'ru');
-    });
-    for (const key of sorted) entries.push([key, map.get(key)!]);
-    return entries;
+    return [...map.entries()]
+      .sort(([a], [b]) => {
+        if (a === '' && b !== '') return 1;
+        if (a !== '' && b === '') return -1;
+        return a.localeCompare(b, 'ru');
+      })
+      .map(([name, count]) => ({ name, count }));
   }, [items]);
+
+  // Items inside the open folder, filtered by search
+  const visibleItems = useMemo(() => {
+    if (openFolder === null) return [];
+    return items
+      .filter((i) => (i.folder ?? '') === openFolder)
+      .filter((i) => !search || i.title.toLowerCase().includes(search.toLowerCase()));
+  }, [items, openFolder, search]);
 
   const handleFilesUpload = async (files: File[]) => {
     if (files.length === 0) return;
@@ -131,6 +148,23 @@ export function MaterialLibraryPage() {
     setLinkFolder('');
     setShowLinkForm(false);
     load();
+  };
+
+  const handleRenameFolder = async () => {
+    if (!renamingFolder || !renameValue.trim() || renameValue.trim() === renamingFolder) {
+      setRenamingFolder(null);
+      return;
+    }
+    setRenaming(true);
+    try {
+      await materialLibraryApi.renameFolder(renamingFolder, renameValue.trim());
+      if (openFolder === renamingFolder) setOpenFolder(renameValue.trim());
+      load();
+    } finally {
+      setRenaming(false);
+      setRenamingFolder(null);
+      setRenameValue('');
+    }
   };
 
   const handleDelete = async (item: LibraryItem) => {
@@ -263,24 +297,109 @@ export function MaterialLibraryPage() {
           </div>
         )}
 
-        {/* Library grouped by folder */}
+        {/* Library */}
         {loading ? (
           <div className="text-center text-gray-400 dark:text-slate-500 py-8">Загрузка...</div>
         ) : items.length === 0 ? (
           <div className="text-center text-gray-400 dark:text-slate-500 py-8 text-sm">Библиотека пуста</div>
-        ) : (
-          <div className="space-y-4">
-            {grouped.map(([folder, groupItems]) => (
-              <div key={folder || '__ungrouped__'} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
-                <div className="px-4 py-2.5 bg-gray-50 dark:bg-slate-700/40 border-b border-gray-200 dark:border-slate-700 flex items-center gap-2">
-                  <span className="text-base">📂</span>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-                    {folder || 'Без папки'}
-                  </span>
-                  <span className="text-xs text-gray-400 dark:text-slate-500 ml-1">{groupItems.length}</span>
+        ) : openFolder === null ? (
+          /* ── Root: folder cards grid ─────────────────────────────────── */
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {folderList.map(({ name, count }) => (
+              <div
+                key={name || '__ungrouped__'}
+                onDoubleClick={() => { if (name) { setRenamingFolder(name); setRenameValue(name); } }}
+                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 flex flex-col gap-3 cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition-all select-none"
+                onClick={() => { if (renamingFolder !== name) { setOpenFolder(name); setSearch(''); setPreviewId(null); } }}
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-4xl">📁</span>
+                  {name && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setRenamingFolder(name); setRenameValue(name); }}
+                      className="text-gray-300 dark:text-slate-600 hover:text-gray-500 dark:hover:text-slate-400 text-sm leading-none p-1 -m-1"
+                      title="Переименовать"
+                    >
+                      ✏️
+                    </button>
+                  )}
                 </div>
+
+                {renamingFolder === name ? (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRenameFolder();
+                        if (e.key === 'Escape') { setRenamingFolder(null); setRenameValue(''); }
+                      }}
+                      className="w-full border border-blue-400 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={handleRenameFolder}
+                        disabled={renaming}
+                        className="flex-1 text-xs py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                      >
+                        {renaming ? '...' : 'OK'}
+                      </button>
+                      <button
+                        onClick={() => { setRenamingFolder(null); setRenameValue(''); }}
+                        className="flex-1 text-xs py-1 border border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate">
+                      {name || 'Без папки'}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500">{count} {count === 1 ? 'файл' : count < 5 ? 'файла' : 'файлов'}</p>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* ── Folder view ─────────────────────────────────────────────── */
+          <div className="space-y-4">
+            {/* Breadcrumb + search */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => { setOpenFolder(null); setSearch(''); setPreviewId(null); setUploadFolder(''); }}
+                className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white font-medium"
+              >
+                ← Назад
+              </button>
+              <span className="text-gray-300 dark:text-slate-600">/</span>
+              <span className="text-sm font-semibold text-gray-800 dark:text-slate-100">
+                📂 {openFolder || 'Без папки'}
+              </span>
+              <div className="ml-auto">
+                <input
+                  type="text"
+                  placeholder="Поиск по названию..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
+                />
+              </div>
+            </div>
+
+            {/* Items list */}
+            {visibleItems.length === 0 ? (
+              <div className="text-center text-gray-400 dark:text-slate-500 py-8 text-sm">
+                {search ? 'Ничего не найдено' : 'Папка пуста'}
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
                 <div className="divide-y divide-gray-100 dark:divide-slate-700">
-                  {groupItems.map((item) => {
+                  {visibleItems.map((item) => {
                     const isOpen = previewId === item.id;
                     return (
                       <div key={item.id} className="overflow-hidden">
@@ -299,26 +418,18 @@ export function MaterialLibraryPage() {
                           </div>
                           <div className="flex items-center gap-3 ml-4 shrink-0">
                             {item.type === MaterialType.LINK ? (
-                              <a
-                                href={item.url!}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                              >
+                              <a href={item.url!} target="_blank" rel="noreferrer"
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                                 Открыть →
                               </a>
                             ) : item.storage_path && (
-                              <button
-                                onClick={() => handlePreview(item)}
-                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                              >
+                              <button onClick={() => handlePreview(item)}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                                 {isOpen ? 'Свернуть ↑' : 'Открыть ↓'}
                               </button>
                             )}
-                            <button
-                              onClick={() => handleDelete(item)}
-                              className="text-xs text-red-500 hover:text-red-700"
-                            >
+                            <button onClick={() => handleDelete(item)}
+                              className="text-xs text-red-500 hover:text-red-700">
                               Удалить
                             </button>
                           </div>
@@ -327,20 +438,14 @@ export function MaterialLibraryPage() {
                         {isOpen && item.storage_path && (
                           <div className="bg-gray-50 dark:bg-slate-900/50">
                             {item.type === MaterialType.PDF && (
-                              <iframe
-                                src={`/api/materials/file/${item.storage_path}`}
-                                title={item.title}
-                                className="w-full border-0"
-                                style={{ height: '80vh' }}
-                              />
+                              <iframe src={`/api/materials/file/${item.storage_path}`} title={item.title}
+                                className="w-full border-0" style={{ height: '80vh' }} />
                             )}
                             {item.type === MaterialType.DOC && (
                               <div className="p-6 overflow-auto" style={{ maxHeight: '80vh' }}>
                                 {docHtmlCache[item.storage_path] ? (
-                                  <div
-                                    className="prose prose-sm dark:prose-invert max-w-none"
-                                    dangerouslySetInnerHTML={{ __html: docHtmlCache[item.storage_path] }}
-                                  />
+                                  <div className="prose prose-sm dark:prose-invert max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: docHtmlCache[item.storage_path] }} />
                                 ) : (
                                   <div className="text-center text-gray-400 dark:text-slate-500 py-8">Загрузка документа...</div>
                                 )}
@@ -348,25 +453,16 @@ export function MaterialLibraryPage() {
                             )}
                             {item.type === MaterialType.VIDEO && (
                               <div className="p-4">
-                                <video
-                                  src={`/api/materials/file/${item.storage_path}`}
-                                  controls
-                                  controlsList="nodownload"
-                                  disablePictureInPicture
+                                <video src={`/api/materials/file/${item.storage_path}`} controls
+                                  controlsList="nodownload" disablePictureInPicture
                                   onContextMenu={(e) => e.preventDefault()}
-                                  className="w-full rounded-lg"
-                                  style={{ maxHeight: '70vh' }}
-                                />
+                                  className="w-full rounded-lg" style={{ maxHeight: '70vh' }} />
                               </div>
                             )}
                             {item.type === MaterialType.IMAGE && (
                               <div className="p-4 flex justify-center">
-                                <img
-                                  src={materialLibraryApi.getViewUrl(item.id)}
-                                  alt={item.title}
-                                  className="max-w-full rounded-lg"
-                                  style={{ maxHeight: '70vh' }}
-                                />
+                                <img src={materialLibraryApi.getViewUrl(item.id)} alt={item.title}
+                                  className="max-w-full rounded-lg" style={{ maxHeight: '70vh' }} />
                               </div>
                             )}
                           </div>
@@ -376,7 +472,7 @@ export function MaterialLibraryPage() {
                   })}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>

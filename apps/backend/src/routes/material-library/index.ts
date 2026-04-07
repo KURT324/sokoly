@@ -106,6 +106,21 @@ export async function materialLibraryRoutes(app: FastifyInstance) {
     return reply.status(201).send(item);
   });
 
+  // PATCH /api/material-library/rename-folder
+  app.patch('/rename-folder', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const { oldName, newName } = request.body as { oldName?: string; newName?: string };
+    if (!oldName || !newName?.trim()) {
+      return reply.status(400).send({ error: 'oldName and newName required' });
+    }
+    await prisma.materialLibrary.updateMany({
+      where: { folder: oldName },
+      data: { folder: newName.trim() },
+    });
+    return { success: true };
+  });
+
   // DELETE /api/material-library/:id
   app.delete('/:id', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),

@@ -36,6 +36,9 @@ export const materialLibraryApi = {
   deleteItem: (id: string) =>
     client.delete(`/material-library/${id}`),
 
+  renameFolder: (oldName: string, newName: string) =>
+    client.patch('/material-library/rename-folder', { oldName, newName }),
+
   attachToDay: (libId: string, dayId: string) =>
     client.post<MaterialRecord>(`/material-library/${libId}/attach`, { day_id: dayId }),
 
