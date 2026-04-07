@@ -3,25 +3,27 @@ import fs from 'fs/promises';
 import path from 'path';
 
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-const MAX_DIMENSION = 1920;
-const QUALITY = 85;
-const PNG_CONVERT_THRESHOLD = 500 * 1024; // 500 KB
 
-/**
- * Compress/resize an image file in-place if needed.
- *
- * Rules:
- * - If neither side exceeds 1920px AND size ≤ 500 KB (for PNG) → skip entirely
- * - If PNG > 500 KB → convert to JPEG at quality 85 (smaller file, same visual quality)
- * - If longest side > 1920px → resize proportionally, keep original format at quality 85
- *
- * Returns the final absolute path (may differ from input if PNG→JPEG)
- * and the resulting file size in bytes.
- * Non-image files are returned unchanged.
- */
+const DEFAULT_OPTIONS = {
+  maxDimension: 1920,
+  quality: 85,
+  convertPngToJpeg: true,
+  pngConvertThreshold: 500 * 1024, // 500 KB
+};
+
+/** High-fidelity preset for card images and student annotations */
+export const CARD_IMAGE_OPTIONS = {
+  maxDimension: 3840,
+  quality: 95,
+  convertPngToJpeg: false,
+  pngConvertThreshold: Infinity,
+};
+
 export async function processImageFile(
   filePath: string,
+  options: Partial<typeof DEFAULT_OPTIONS> = {},
 ): Promise<{ outputPath: string; sizeBytes: number }> {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
   const ext = path.extname(filePath).toLowerCase();
 
   if (!IMAGE_EXTS.has(ext)) {
@@ -40,14 +42,14 @@ export async function processImageFile(
   const size = stat.size;
   const isPng = ext === '.png';
 
-  const needsResize = longSide > MAX_DIMENSION;
-  const needsPngConvert = isPng && size > PNG_CONVERT_THRESHOLD;
+  const needsResize = longSide > opts.maxDimension;
+  const needsPngConvert = opts.convertPngToJpeg && isPng && size > opts.pngConvertThreshold;
 
   if (!needsResize && !needsPngConvert) {
     return { outputPath: filePath, sizeBytes: size };
   }
 
-  // Output format: PNG > 500 KB → JPEG; everything else keeps its format
+  // Output format: PNG over threshold → JPEG; everything else keeps its format
   const outputExt = needsPngConvert ? '.jpg' : ext;
   const outputPath =
     outputExt !== ext ? filePath.slice(0, -ext.length) + outputExt : filePath;
@@ -56,20 +58,19 @@ export async function processImageFile(
 
   if (needsResize) {
     pipeline = pipeline.resize({
-      width: MAX_DIMENSION,
-      height: MAX_DIMENSION,
+      width: opts.maxDimension,
+      height: opts.maxDimension,
       fit: 'inside',
       withoutEnlargement: true,
     });
   }
 
   if (outputExt === '.webp') {
-    pipeline = pipeline.webp({ quality: QUALITY });
+    pipeline = pipeline.webp({ quality: opts.quality });
   } else if (outputExt === '.png') {
-    pipeline = pipeline.png({ quality: QUALITY });
+    pipeline = pipeline.png({ quality: opts.quality });
   } else {
-    // .jpg / .jpeg, and PNG→JPEG conversions
-    pipeline = pipeline.jpeg({ quality: QUALITY });
+    pipeline = pipeline.jpeg({ quality: opts.quality });
   }
 
   const buf = await pipeline.toBuffer();

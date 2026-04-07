@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserRole, CardTaskStatus } from '@prisma/client';
 import { prisma } from '../../db';
 import { authGuard, roleGuard } from '../../middleware/authGuard';
-import { processImageFile } from '../../services/imageProcessor';
+import { processImageFile, CARD_IMAGE_OPTIONS } from '../../services/imageProcessor';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
@@ -62,7 +62,7 @@ export async function cardTasksRoutes(app: FastifyInstance) {
         const rawName = `${uuidv4()}${ext}`;
         const rawPath = path.join(STORAGE_PATH, 'cards', rawName);
         await pipeline(part.file, fsSync.createWriteStream(rawPath));
-        const processed = await processImageFile(rawPath);
+        const processed = await processImageFile(rawPath, CARD_IMAGE_OPTIONS);
         imagePath = path.basename(processed.outputPath);
       }
     }
@@ -292,7 +292,7 @@ export async function cardTasksRoutes(app: FastifyInstance) {
         const rawName = `${uuidv4()}.png`;
         const rawPath = path.join(STORAGE_PATH, 'annotations', rawName);
         await pipeline(part.file, fsSync.createWriteStream(rawPath));
-        const processed = await processImageFile(rawPath);
+        const processed = await processImageFile(rawPath, CARD_IMAGE_OPTIONS);
         annotationPath = path.basename(processed.outputPath);
       }
     }
