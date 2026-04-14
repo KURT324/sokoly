@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -55,6 +55,7 @@ function DraggableCard({
   bulkMode,
   bulkSelected,
   onBulkToggle,
+  bulkStudentStatuses,
 }: {
   card: CardLibrary;
   onAssign: (card: CardLibrary) => void;
@@ -64,6 +65,7 @@ function DraggableCard({
   bulkMode?: boolean;
   bulkSelected?: boolean;
   onBulkToggle?: (id: string) => void;
+  bulkStudentStatuses?: Array<{ callsign: string; status: CardTaskStatus }>;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `card-${card.id}`,
@@ -122,6 +124,16 @@ function DraggableCard({
           )}
         </div>
         <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-2">{card.instructions}</p>
+        {bulkMode && bulkStudentStatuses && bulkStudentStatuses.length > 0 && (
+          <div className="flex flex-col gap-0.5 pt-1">
+            {bulkStudentStatuses.map(({ callsign, status }) => (
+              <div key={callsign} className={`flex items-center gap-1.5 text-xs px-1.5 py-0.5 rounded ${ASSIGN_STATUS_BADGE[status]?.cls ?? ''}`}>
+                <span className="font-medium truncate">{callsign}</span>
+                <span className="shrink-0">{ASSIGN_STATUS_BADGE[status]?.label ?? status}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {!bulkMode && (
           <div className="flex gap-2 pt-1">
             <button
@@ -485,6 +497,26 @@ export function TeacherCardsPage() {
       )
     : {};
 
+  // Bulk mode: map library_id → [{callsign, status}] for each selected student that already has this card
+  const bulkStatusMap = useMemo<Record<string, Array<{ callsign: string; status: CardTaskStatus }>>>(() => {
+    if (!bulkMode || bulkStudents.size === 0) return {};
+    const lookup = new Map<string, CardTaskStatus>();
+    for (const t of assignments) {
+      if (t.library_id) lookup.set(`${t.student_id}__${t.library_id}`, t.status);
+    }
+    const callsignMap = new Map(students.map((s) => [s.id, s.callsign]));
+    const result: Record<string, Array<{ callsign: string; status: CardTaskStatus }>> = {};
+    for (const libCard of library) {
+      const entries: Array<{ callsign: string; status: CardTaskStatus }> = [];
+      for (const sid of bulkStudents) {
+        const status = lookup.get(`${sid}__${libCard.id}`);
+        if (status) entries.push({ callsign: callsignMap.get(sid) ?? sid, status });
+      }
+      if (entries.length > 0) result[libCard.id] = entries;
+    }
+    return result;
+  }, [bulkMode, bulkStudents, assignments, students, library]);
+
   // Stats (over all assignments, ignoring filters)
   const statsTotal = assignments.length;
   const statsCompleted = assignments.filter((t) => t.status === 'COMPLETED').length;
@@ -781,6 +813,7 @@ export function TeacherCardsPage() {
                           isAssignTarget={assignCard?.id === card.id}
                           assignmentStatus={studentCardStatusMap[card.id] ?? null}
                           bulkMode={bulkMode}
+                          bulkStudentStatuses={bulkStatusMap[card.id]}
                           bulkSelected={bulkCards.has(card.id)}
                           onBulkToggle={(id) => setBulkCards((prev) => {
                             const next = new Set(prev);
