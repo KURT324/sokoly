@@ -43,9 +43,9 @@ export async function adminCohortsRoutes(app: FastifyInstance) {
       },
     });
 
-    // Auto-create 11 days
+    // Auto-create 12 days
     await prisma.day.createMany({
-      data: Array.from({ length: 11 }, (_, i) => ({
+      data: Array.from({ length: 12 }, (_, i) => ({
         day_number: i + 1,
         cohort_id: cohort.id,
         status: DayStatus.LOCKED,
