@@ -995,7 +995,7 @@ export function TeacherCardsPage() {
                           src={cardTasksApi.getAnnotationUrl(latest.annotation_path)}
                           alt="annotation"
                           onClick={() => setLightboxSrc(cardTasksApi.getAnnotationUrl(latest.annotation_path))}
-                          className="h-48 rounded border border-gray-200 dark:border-slate-700 object-contain cursor-zoom-in"
+                          className="w-full max-h-[60vh] rounded border border-gray-200 dark:border-slate-700 object-contain cursor-zoom-in"
                         />
                       </div>
                       <p className="text-sm bg-gray-50 dark:bg-slate-700/30 rounded-lg px-3 py-2">

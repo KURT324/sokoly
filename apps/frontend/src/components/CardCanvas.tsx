@@ -11,6 +11,7 @@ interface Props {
 }
 
 export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
   const [tool, setTool] = useState<Tool>('rect');
@@ -22,25 +23,49 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
   const activeShapeRef = useRef<fabric.Object | null>(null);
 
   useEffect(() => {
-    const canvas = new fabric.Canvas(canvasElRef.current!, { width: 600, height: 400 });
-    fabricRef.current = canvas;
+    let cancelled = false;
 
-    fabric.Image.fromURL(backgroundUrl, (img: fabric.Image) => {
-      img.set({ selectable: false, evented: false });
-      canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-        scaleX: canvas.width! / (img.width || 600),
-        scaleY: canvas.height! / (img.height || 400),
+    const containerWidth = containerRef.current?.offsetWidth || 800;
+
+    const probe = new Image();
+    probe.crossOrigin = 'anonymous';
+
+    const init = (imgW: number, imgH: number) => {
+      if (cancelled || !canvasElRef.current) return;
+
+      const ratio = imgH / imgW;
+      // cap canvas height at 1.5× width so portrait images don't go off screen
+      const canvasH = Math.round(containerWidth * Math.min(ratio, 1.5));
+
+      const canvas = new fabric.Canvas(canvasElRef.current, {
+        width: containerWidth,
+        height: canvasH,
       });
-    }, { crossOrigin: 'anonymous' });
+      fabricRef.current = canvas;
 
-    const updateHas = () => onHasDrawing(canvas.getObjects().length > 0);
-    canvas.on('object:added', updateHas);
-    canvas.on('object:removed', updateHas);
+      fabric.Image.fromURL(backgroundUrl, (img: fabric.Image) => {
+        if (cancelled) return;
+        img.set({ selectable: false, evented: false });
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+          scaleX: canvas.width! / (img.width || imgW),
+          scaleY: canvas.height! / (img.height || imgH),
+        });
+      }, { crossOrigin: 'anonymous' });
 
-    onExport(() => canvas.toDataURL({ format: 'png' }));
+      const updateHas = () => onHasDrawing(canvas.getObjects().length > 0);
+      canvas.on('object:added', updateHas);
+      canvas.on('object:removed', updateHas);
+
+      onExport(() => canvas.toDataURL({ format: 'png' }));
+    };
+
+    probe.onload = () => init(probe.naturalWidth, probe.naturalHeight);
+    probe.onerror = () => init(4, 3); // fallback 4:3
+    probe.src = backgroundUrl;
 
     return () => {
-      canvas.dispose();
+      cancelled = true;
+      fabricRef.current?.dispose();
       fabricRef.current = null;
     };
   }, [backgroundUrl]);
@@ -64,7 +89,6 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
     if (tool === 'eraser') {
       canvas.isDrawingMode = false;
       canvas.selection = false;
-      // Eraser = delete last object on click
       canvas.on('mouse:down', () => {
         const objects = canvas.getObjects();
         if (objects.length > 0) {
@@ -171,7 +195,7 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
         </div>
       </div>
 
-      <div className="border border-gray-300 rounded overflow-hidden inline-block">
+      <div ref={containerRef} className="w-full border border-gray-300 rounded overflow-hidden">
         <canvas ref={canvasElRef} />
       </div>
     </div>
