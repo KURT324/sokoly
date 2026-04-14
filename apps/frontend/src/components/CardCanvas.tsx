@@ -92,7 +92,7 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
       });
 
       // Double-click to reset zoom
-      canvas.upperCanvasEl.addEventListener('dblclick', () => {
+      (canvas as any).upperCanvasEl.addEventListener('dblclick', () => {
         canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
         setZoom(1);
       });
