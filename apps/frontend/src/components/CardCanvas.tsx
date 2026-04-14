@@ -20,11 +20,22 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
   const [tool, setTool] = useState<Tool>('rect');
   const [brushSize, setBrushSize] = useState(4);
   const [zoom, setZoom] = useState(1);
+  // Triggers tool effect re-run once canvas is async-initialized
+  const [canvasReady, setCanvasReady] = useState(false);
+
+  // Keep latest tool in a ref for use inside key event handlers (avoid stale closure)
+  const toolRef = useRef<Tool>('rect');
+  useEffect(() => { toolRef.current = tool; }, [tool]);
 
   const isDrawingShapeRef = useRef(false);
   const originXRef = useRef(0);
   const originYRef = useRef(0);
   const activeShapeRef = useRef<fabric.Object | null>(null);
+
+  // Panning state
+  const isSpaceDownRef = useRef(false);
+  const isPanningRef = useRef(false);
+  const lastPanPointRef = useRef({ x: 0, y: 0 });
 
   const changeZoom = (delta: number) => {
     const canvas = fabricRef.current;
@@ -43,11 +54,12 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
     setZoom(1);
   };
 
+  // ── Canvas initialization (async — waits for image probe) ──────────────────
   useEffect(() => {
     let cancelled = false;
+    setCanvasReady(false);
 
     const containerWidth = containerRef.current?.offsetWidth || 800;
-
     const probe = new Image();
     probe.crossOrigin = 'anonymous';
 
@@ -76,28 +88,25 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
       canvas.on('object:added', updateHas);
       canvas.on('object:removed', updateHas);
 
-      // Mouse wheel zoom
+      // Scroll-wheel zoom (zoom to pointer position)
       canvas.on('mouse:wheel', (opt) => {
         const e = opt.e as WheelEvent;
         e.preventDefault();
         e.stopPropagation();
-        const currentZoom = canvas.getZoom();
-        const direction = e.deltaY < 0 ? 1 : -1;
-        const next = Math.min(
-          Math.max(Math.round((currentZoom + direction * 0.1) * 100) / 100, MIN_ZOOM),
-          MAX_ZOOM,
-        );
+        const cur = canvas.getZoom();
+        const dir = e.deltaY < 0 ? 1 : -1;
+        const next = Math.min(Math.max(Math.round((cur + dir * 0.1) * 100) / 100, MIN_ZOOM), MAX_ZOOM);
         canvas.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), next);
         setZoom(next);
       });
 
-      // Double-click to reset zoom
+      // Double-click → reset zoom
       (canvas as any).upperCanvasEl.addEventListener('dblclick', () => {
         canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
         setZoom(1);
       });
 
-      // Export at zoom=1 so the full image is captured
+      // Export at zoom=1 so the full canvas is captured, not just the visible crop
       onExport(() => {
         const savedVpt = canvas.viewportTransform
           ? ([...canvas.viewportTransform] as [number, number, number, number, number, number])
@@ -108,6 +117,8 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
         canvas.renderAll();
         return dataUrl;
       });
+
+      setCanvasReady(true);
     };
 
     probe.onload = () => init(probe.naturalWidth, probe.naturalHeight);
@@ -116,61 +127,84 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
 
     return () => {
       cancelled = true;
+      setCanvasReady(false);
       fabricRef.current?.dispose();
       fabricRef.current = null;
     };
   }, [backgroundUrl]);
 
+  // ── Tool handlers — re-runs when canvas becomes ready OR tool/brush changes ─
   useEffect(() => {
     const canvas = fabricRef.current;
-    if (!canvas) return;
+    if (!canvas || !canvasReady) return;
 
     canvas.off('mouse:down');
     canvas.off('mouse:move');
     canvas.off('mouse:up');
 
-    if (tool === 'brush') {
-      canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush.color = RED;
-      canvas.freeDrawingBrush.width = brushSize;
-      canvas.selection = false;
-      return;
-    }
+    // Combined mouse:down — panning takes priority over drawing
+    canvas.on('mouse:down', (opt) => {
+      const e = opt.e as MouseEvent;
 
-    if (tool === 'eraser') {
-      canvas.isDrawingMode = false;
-      canvas.selection = false;
-      canvas.on('mouse:down', () => {
+      // Middle-mouse pan
+      if (e.button === 1) {
+        e.preventDefault();
+        isPanningRef.current = true;
+        lastPanPointRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      // Space+left-click pan
+      if (isSpaceDownRef.current) {
+        isPanningRef.current = true;
+        lastPanPointRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      // Eraser
+      if (tool === 'eraser') {
         const objects = canvas.getObjects();
         if (objects.length > 0) {
           canvas.remove(objects[objects.length - 1]);
           canvas.renderAll();
         }
-      });
-      return;
-    }
+        return;
+      }
 
-    canvas.isDrawingMode = false;
-    canvas.selection = false;
+      // Brush is handled by fabric's own isDrawingMode
+      if (tool === 'brush') return;
 
-    canvas.on('mouse:down', (opt) => {
+      // Rect / Ellipse
       const ptr = canvas.getPointer(opt.e);
       isDrawingShapeRef.current = true;
       originXRef.current = ptr.x;
       originYRef.current = ptr.y;
 
-      const opts = {
+      const shapeOpts = {
         left: ptr.x, top: ptr.y, width: 0, height: 0,
         fill: 'transparent', stroke: RED, strokeWidth: brushSize, selectable: false,
       };
       const shape = tool === 'rect'
-        ? new fabric.Rect(opts)
-        : new fabric.Ellipse({ ...opts, rx: 0, ry: 0 });
+        ? new fabric.Rect(shapeOpts)
+        : new fabric.Ellipse({ ...shapeOpts, rx: 0, ry: 0 });
       canvas.add(shape);
       activeShapeRef.current = shape;
     });
 
     canvas.on('mouse:move', (opt) => {
+      // Pan
+      if (isPanningRef.current) {
+        const e = opt.e as MouseEvent;
+        const dx = e.clientX - lastPanPointRef.current.x;
+        const dy = e.clientY - lastPanPointRef.current.y;
+        lastPanPointRef.current = { x: e.clientX, y: e.clientY };
+        const vpt = canvas.viewportTransform!;
+        vpt[4] += dx;
+        vpt[5] += dy;
+        canvas.requestRenderAll();
+        return;
+      }
+
       if (!isDrawingShapeRef.current || !activeShapeRef.current) return;
       const ptr = canvas.getPointer(opt.e);
       const w = Math.abs(ptr.x - originXRef.current);
@@ -187,10 +221,66 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
     });
 
     canvas.on('mouse:up', () => {
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        return;
+      }
       isDrawingShapeRef.current = false;
       activeShapeRef.current = null;
     });
-  }, [tool, brushSize]);
+
+    if (tool === 'brush') {
+      canvas.isDrawingMode = true;
+      canvas.freeDrawingBrush.color = RED;
+      canvas.freeDrawingBrush.width = brushSize;
+    } else {
+      canvas.isDrawingMode = false;
+    }
+    canvas.selection = false;
+  }, [tool, brushSize, canvasReady]);
+
+  // ── Space key: toggle pan mode, temporarily disabling brush drawing ─────────
+  useEffect(() => {
+    const upper = () => (fabricRef.current as any)?.upperCanvasEl as HTMLElement | null;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return;
+      // Don't hijack space in text inputs
+      if ((e.target as HTMLElement).tagName === 'TEXTAREA' ||
+          (e.target as HTMLElement).tagName === 'INPUT') return;
+      e.preventDefault();
+      isSpaceDownRef.current = true;
+      if (fabricRef.current) fabricRef.current.isDrawingMode = false;
+      const el = upper();
+      if (el) el.style.cursor = 'grab';
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      isSpaceDownRef.current = false;
+      isPanningRef.current = false;
+      // Restore brush mode if needed
+      if (fabricRef.current && toolRef.current === 'brush') {
+        fabricRef.current.isDrawingMode = true;
+      }
+      const el = upper();
+      if (el) el.style.cursor = '';
+    };
+
+    // Stop panning if mouse released outside canvas
+    const onMouseUp = () => {
+      if (isPanningRef.current) isPanningRef.current = false;
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   const handleUndo = () => {
     const canvas = fabricRef.current;
@@ -250,6 +340,7 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
         <div className="flex items-center gap-1 ml-auto">
           <button
             type="button"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={() => changeZoom(-ZOOM_STEP)}
             disabled={zoom <= MIN_ZOOM}
             className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 text-base leading-none"
@@ -258,14 +349,16 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={resetZoom}
             className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 min-w-[3.5rem] text-center"
-            title="Сбросить масштаб (или двойной клик на изображении)"
+            title="Сбросить масштаб (двойной клик на изображении)"
           >
             {Math.round(zoom * 100)}%
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={() => changeZoom(ZOOM_STEP)}
             disabled={zoom >= MAX_ZOOM}
             className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 text-base leading-none"
@@ -275,7 +368,11 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
         </div>
       </div>
 
-      <div ref={containerRef} className="w-full border border-gray-300 rounded overflow-hidden">
+      <p className="text-xs text-gray-400 dark:text-slate-500">
+        Пробел + перетаскивание или средняя кнопка мыши — перемещение по изображению
+      </p>
+
+      <div ref={containerRef} className="w-full border border-gray-300 dark:border-slate-600 rounded overflow-hidden">
         <canvas ref={canvasElRef} />
       </div>
     </div>
