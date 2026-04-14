@@ -108,7 +108,7 @@ function DraggableCard({
         <img
           src={cardTasksApi.getImageUrl(card.image_path)}
           alt={card.title}
-          className="w-full h-36 object-cover pointer-events-none"
+          className="w-full h-52 object-cover pointer-events-none"
           draggable={false}
         />
       </div>
@@ -756,7 +756,7 @@ export function TeacherCardsPage() {
                   {loadingLib ? (
                     <p className="text-gray-400 dark:text-slate-500 text-sm">Загрузка...</p>
                   ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                       {/* Root drop zone — shown when inside a folder */}
                       <RootDropZone visible={!!openFolderId} />
 
