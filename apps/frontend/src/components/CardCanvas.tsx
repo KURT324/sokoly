@@ -3,6 +3,9 @@ import { fabric } from 'fabric';
 
 type Tool = 'rect' | 'ellipse' | 'brush' | 'eraser';
 const RED = '#e53e3e';
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3.0;
+const ZOOM_STEP = 0.25;
 
 interface Props {
   backgroundUrl: string;
@@ -16,11 +19,29 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
   const fabricRef = useRef<fabric.Canvas | null>(null);
   const [tool, setTool] = useState<Tool>('rect');
   const [brushSize, setBrushSize] = useState(4);
+  const [zoom, setZoom] = useState(1);
 
   const isDrawingShapeRef = useRef(false);
   const originXRef = useRef(0);
   const originYRef = useRef(0);
   const activeShapeRef = useRef<fabric.Object | null>(null);
+
+  const changeZoom = (delta: number) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const current = canvas.getZoom();
+    const next = Math.min(Math.max(Math.round((current + delta) * 100) / 100, MIN_ZOOM), MAX_ZOOM);
+    const center = new fabric.Point(canvas.width! / 2, canvas.height! / 2);
+    canvas.zoomToPoint(center, next);
+    setZoom(next);
+  };
+
+  const resetZoom = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    setZoom(1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -34,7 +55,6 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
       if (cancelled || !canvasElRef.current) return;
 
       const ratio = imgH / imgW;
-      // cap canvas height at 1.5× width so portrait images don't go off screen
       const canvasH = Math.round(containerWidth * Math.min(ratio, 1.5));
 
       const canvas = new fabric.Canvas(canvasElRef.current, {
@@ -56,11 +76,42 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
       canvas.on('object:added', updateHas);
       canvas.on('object:removed', updateHas);
 
-      onExport(() => canvas.toDataURL({ format: 'png' }));
+      // Mouse wheel zoom
+      canvas.on('mouse:wheel', (opt) => {
+        const e = opt.e as WheelEvent;
+        e.preventDefault();
+        e.stopPropagation();
+        const currentZoom = canvas.getZoom();
+        const direction = e.deltaY < 0 ? 1 : -1;
+        const next = Math.min(
+          Math.max(Math.round((currentZoom + direction * 0.1) * 100) / 100, MIN_ZOOM),
+          MAX_ZOOM,
+        );
+        canvas.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), next);
+        setZoom(next);
+      });
+
+      // Double-click to reset zoom
+      canvas.upperCanvasEl.addEventListener('dblclick', () => {
+        canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        setZoom(1);
+      });
+
+      // Export at zoom=1 so the full image is captured
+      onExport(() => {
+        const savedVpt = canvas.viewportTransform
+          ? ([...canvas.viewportTransform] as [number, number, number, number, number, number])
+          : ([1, 0, 0, 1, 0, 0] as [number, number, number, number, number, number]);
+        canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        const dataUrl = canvas.toDataURL({ format: 'png' });
+        canvas.setViewportTransform(savedVpt);
+        canvas.renderAll();
+        return dataUrl;
+      });
     };
 
     probe.onload = () => init(probe.naturalWidth, probe.naturalHeight);
-    probe.onerror = () => init(4, 3); // fallback 4:3
+    probe.onerror = () => init(4, 3);
     probe.src = backgroundUrl;
 
     return () => {
@@ -154,6 +205,7 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3 flex-wrap">
+        {/* Drawing tools */}
         <div className="flex gap-1">
           {(['rect', 'ellipse', 'brush', 'eraser'] as Tool[]).map((t) => (
             <button
@@ -192,6 +244,34 @@ export function CardCanvas({ backgroundUrl, onHasDrawing, onExport }: Props) {
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded-full bg-red-500 border border-red-700" />
           <span className="text-xs text-gray-500">Красный</span>
+        </div>
+
+        {/* Zoom controls */}
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            type="button"
+            onClick={() => changeZoom(-ZOOM_STEP)}
+            disabled={zoom <= MIN_ZOOM}
+            className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 text-base leading-none"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={resetZoom}
+            className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 min-w-[3.5rem] text-center"
+            title="Сбросить масштаб (или двойной клик на изображении)"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            onClick={() => changeZoom(ZOOM_STEP)}
+            disabled={zoom >= MAX_ZOOM}
+            className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 text-base leading-none"
+          >
+            +
+          </button>
         </div>
       </div>
 
