@@ -56,6 +56,15 @@ export async function adminUsersRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Bad Request', message: 'email, callsign, role, password required' });
     }
 
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!EMAIL_RE.test(email)) {
+      return reply.status(400).send({ error: 'Bad Request', message: 'Invalid email format' });
+    }
+
+    if (callsign.length > 50) {
+      return reply.status(400).send({ error: 'Bad Request', message: 'callsign too long (max 50 characters)' });
+    }
+
     if (!Object.values(UserRole).includes(role)) {
       return reply.status(400).send({ error: 'Bad Request', message: 'Invalid role' });
     }
@@ -142,8 +151,8 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const { password } = request.body as { password?: string };
 
-    if (!password || password.length < 6) {
-      return reply.status(400).send({ error: 'Bad Request', message: 'password must be at least 6 characters' });
+    if (!password || password.length < 8 || !/\d/.test(password)) {
+      return reply.status(400).send({ error: 'Bad Request', message: 'Password must be at least 8 characters and contain at least one number' });
     }
 
     const user = await prisma.user.findUnique({ where: { id } });

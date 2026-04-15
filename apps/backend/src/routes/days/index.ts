@@ -220,10 +220,11 @@ export async function daysRoutes(app: FastifyInstance) {
   app.delete('/:id/materials/:matId', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
-    const { matId } = request.params as { id: string; matId: string };
+    const { id, matId } = request.params as { id: string; matId: string };
 
     const material = await prisma.material.findUnique({ where: { id: matId } });
     if (!material) return reply.status(404).send({ error: 'Not Found' });
+    if (material.day_id !== id) return reply.status(404).send({ error: 'Not Found' });
 
     if (material.storage_path) {
       const filePath = path.join(STORAGE_PATH, material.storage_path);

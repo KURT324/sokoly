@@ -12,7 +12,7 @@ import { processImageFile, CARD_IMAGE_OPTIONS } from '../../services/imageProces
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
 async function serveImage(reply: any, dir: string, filename: string) {
-  const filePath = path.join(STORAGE_PATH, dir, filename);
+  const filePath = path.join(STORAGE_PATH, dir, path.basename(filename));
   try {
     const buf = await fs.readFile(filePath);
     const ext = path.extname(filename).toLowerCase();
@@ -69,6 +69,12 @@ export async function cardTasksRoutes(app: FastifyInstance) {
 
     if (!title.trim() || !instructions.trim() || !imagePath) {
       return reply.status(400).send({ error: 'title, instructions and image are required' });
+    }
+    if (title.trim().length > 200) {
+      return reply.status(400).send({ error: 'title too long (max 200 characters)' });
+    }
+    if (instructions.trim().length > 2000) {
+      return reply.status(400).send({ error: 'instructions too long (max 2000 characters)' });
     }
 
     const card = await prisma.cardLibrary.create({
@@ -333,6 +339,7 @@ export async function cardTasksRoutes(app: FastifyInstance) {
 
     const attempt = await prisma.cardAttempt.findUnique({ where: { id: attId } });
     if (!attempt) return reply.status(404).send({ error: 'Not Found' });
+    if (attempt.task_id !== id) return reply.status(404).send({ error: 'Not Found' });
 
     const newStatus = is_correct ? CardTaskStatus.COMPLETED : CardTaskStatus.RETURNED;
 

@@ -17,7 +17,7 @@ export async function directChatsRoutes(app: FastifyInstance) {
   // GET /api/direct-chats/files/:filename — serve attachments
   app.get('/files/:filename', { preHandler: authGuard }, async (request, reply) => {
     const { filename } = request.params as { filename: string };
-    const filePath = path.join(STORAGE_PATH, 'chat-files', filename);
+    const filePath = path.join(STORAGE_PATH, 'chat-files', path.basename(filename));
     try {
       const buf = await fs.readFile(filePath);
       const ext = path.extname(filename).toLowerCase();
@@ -146,13 +146,18 @@ export async function directChatsRoutes(app: FastifyInstance) {
     const attachments: Array<{ filename: string; storage_path: string; mime_type: string; size: number }> = [];
 
     if (contentType.includes('multipart')) {
+      const ALLOWED_CHAT_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.docx', '.mp4']);
       const parts = request.parts({ limits: { fileSize: 10 * 1024 * 1024 } });
       for await (const part of parts) {
         if (part.type === 'field' && part.fieldname === 'content') {
           content = part.value as string;
         } else if (part.type === 'file') {
-          await fs.mkdir(path.join(STORAGE_PATH, 'chat-files'), { recursive: true });
           const ext = path.extname(part.filename).toLowerCase();
+          if (!ALLOWED_CHAT_EXTS.has(ext)) {
+            await part.file.resume();
+            return reply.status(400).send({ error: 'Unsupported file type' });
+          }
+          await fs.mkdir(path.join(STORAGE_PATH, 'chat-files'), { recursive: true });
           let storedName = `${uuidv4()}${ext}`;
           const rawPath = path.join(STORAGE_PATH, 'chat-files', storedName);
           await pipeline(part.file, fsSync.createWriteStream(rawPath));

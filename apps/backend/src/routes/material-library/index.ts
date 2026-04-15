@@ -53,6 +53,7 @@ export async function materialLibraryRoutes(app: FastifyInstance) {
     if (!contentType.includes('multipart')) {
       const { url, title, folder } = request.body as { url: string; title: string; folder?: string };
       if (!url || !title) return reply.status(400).send({ error: 'url and title required' });
+      if (title.length > 200) return reply.status(400).send({ error: 'title too long (max 200 characters)' });
 
       const item = await prisma.materialLibrary.create({
         data: {

@@ -45,7 +45,7 @@ export async function testsRoutes(app: FastifyInstance) {
   // GET /api/tests/question-images/:filename — serve drawing background
   app.get('/question-images/:filename', { preHandler: authGuard }, async (request, reply) => {
     const { filename } = request.params as { filename: string };
-    const filePath = path.join(STORAGE_PATH, 'questions', filename);
+    const filePath = path.join(STORAGE_PATH, 'questions', path.basename(filename));
     try {
       const buf = await fs.readFile(filePath);
       const ext = path.extname(filename).toLowerCase();
@@ -61,7 +61,7 @@ export async function testsRoutes(app: FastifyInstance) {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
     const { filename } = request.params as { filename: string };
-    const filePath = path.join(STORAGE_PATH, 'drawings', filename);
+    const filePath = path.join(STORAGE_PATH, 'drawings', path.basename(filename));
     try {
       const buf = await fs.readFile(filePath);
       return reply.header('Content-Type', 'image/png').header('Cache-Control', 'no-store').send(buf);
@@ -180,8 +180,11 @@ export async function testsRoutes(app: FastifyInstance) {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const test = await prisma.test.findUnique({ where: { id }, select: { is_open: true } });
+    const test = await prisma.test.findUnique({ where: { id }, select: { is_open: true, created_by_id: true } });
     if (!test) return reply.status(404).send({ error: 'Not Found' });
+    if (request.user!.role === UserRole.TEACHER && test.created_by_id !== request.user!.id) {
+      return reply.status(403).send({ error: 'Forbidden' });
+    }
     const updated = await prisma.test.update({
       where: { id },
       data: { is_open: !test.is_open },
@@ -331,6 +334,12 @@ export async function testsRoutes(app: FastifyInstance) {
         variants: VariantInput[];
       };
 
+    const existingTest = await prisma.test.findUnique({ where: { id }, select: { created_by_id: true } });
+    if (!existingTest) return reply.status(404).send({ error: 'Not Found' });
+    if (request.user!.role === UserRole.TEACHER && existingTest.created_by_id !== request.user!.id) {
+      return reply.status(403).send({ error: 'Forbidden' });
+    }
+
     // Delete all existing variants (cascades to questions, answers, assignments)
     await prisma.testVariant.deleteMany({ where: { test_id: id } });
 
@@ -391,6 +400,11 @@ export async function testsRoutes(app: FastifyInstance) {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const test = await prisma.test.findUnique({ where: { id }, select: { created_by_id: true } });
+    if (!test) return reply.status(404).send({ error: 'Not Found' });
+    if (request.user!.role === UserRole.TEACHER && test.created_by_id !== request.user!.id) {
+      return reply.status(403).send({ error: 'Forbidden' });
+    }
     await prisma.test.delete({ where: { id } });
     return { success: true };
   });
@@ -466,6 +480,10 @@ export async function testsRoutes(app: FastifyInstance) {
         if (studentAnswer?.drawing_data) {
           await fs.mkdir(path.join(STORAGE_PATH, 'drawings'), { recursive: true });
           const base64 = studentAnswer.drawing_data.replace(/^data:image\/\w+;base64,/, '');
+          // Reject drawings larger than 10 MB decoded (~13.4 MB base64)
+          if (base64.length > 14_000_000) {
+            return reply.status(400).send({ error: 'Drawing data too large (max 10 MB)' });
+          }
           const buf = Buffer.from(base64, 'base64');
           const filename = `${uuidv4()}.png`;
           await fs.writeFile(path.join(STORAGE_PATH, 'drawings', filename), buf);
@@ -550,8 +568,12 @@ export async function testsRoutes(app: FastifyInstance) {
   app.patch('/:id/submissions/:subId/score', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
-    const { subId } = request.params as { id: string; subId: string };
+    const { id, subId } = request.params as { id: string; subId: string };
     const { manual_score } = request.body as { manual_score: number };
+
+    const submission = await prisma.testSubmission.findUnique({ where: { id: subId }, select: { test_id: true } });
+    if (!submission) return reply.status(404).send({ error: 'Not Found' });
+    if (submission.test_id !== id) return reply.status(404).send({ error: 'Not Found' });
 
     const updated = await prisma.testSubmission.update({
       where: { id: subId },
