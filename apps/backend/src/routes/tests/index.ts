@@ -85,8 +85,10 @@ export async function testsRoutes(app: FastifyInstance) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     const buffer = Buffer.concat(chunks);
+    console.log(`[parse-docx] filename="${data.filename}" size=${buffer.length} bytes`);
 
     const questions = await parseDocxBuffer(buffer);
+    console.log(`[parse-docx] parsed ${questions.length} question(s):`, JSON.stringify(questions, null, 2));
 
     if (questions.length === 0) {
       return reply.status(400).send({
