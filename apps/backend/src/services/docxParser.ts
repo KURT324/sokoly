@@ -67,18 +67,23 @@ export async function parseDocxBuffer(buffer: Buffer): Promise<ParsedQuestion[]>
       continue;
     }
 
-    if (!current) continue;
-
     const correctMatch = line.match(/^\+\s*(.+)/);
     const wrongMatch = line.match(/^-\s*(.+)/);
     const pairMatch = line.match(/^=\s*(.+?)\s*->\s*(.+)/);
 
     if (correctMatch) {
+      if (!current) continue;
       current.answers.push({ answer_text: correctMatch[1].trim(), is_correct: true });
     } else if (wrongMatch) {
+      if (!current) continue;
       current.answers.push({ answer_text: wrongMatch[1].trim(), is_correct: false });
     } else if (pairMatch) {
+      if (!current) continue;
       current.question_text += `\n${pairMatch[1].trim()} → ${pairMatch[2].trim()}`;
+    } else {
+      // Format 3 (no numbering): any line that isn't an answer marker starts a new question
+      if (current) questions.push(current);
+      current = { type: 'SINGLE', question_text: line, order_index: 0, answers: [], _autoType: true } as any;
     }
   }
 
