@@ -17,19 +17,25 @@ export async function parseDocxBuffer(buffer: Buffer): Promise<ParsedQuestion[]>
 
   console.log('[parse-docx] raw text from mammoth:\n---\n' + rawText + '\n---');
 
+  // Strip invisible Unicode chars (zero-width space, soft hyphen, BOM, etc.) that Word
+  // embeds in "empty" paragraphs and that survive trim(), then skip genuinely blank lines
+  // inside the loop so they never break the current-question context.
   const lines = rawText
     .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+    .map((l) => l.replace(/[\u00ad\u200b\u200c\u200d\u200e\u200f\ufeff]/g, '').trim());
 
   const questions: ParsedQuestion[] = [];
   let current: ParsedQuestion | null = null;
 
   for (const line of lines) {
+    // Empty lines are silently skipped — they must NOT reset the current question
+    if (line.length === 0) continue;
+
     // Format 1 (explicit type): "1. [SINGLE] text" or "1) [MULTI] text"
     const qMatchTyped = line.match(/^\d+[.)]\s*\[(SINGLE|MULTI|OPEN|MATCH)\]\s*(.+)/i);
-    // Format 2 (no type): "1) text" or "1. text" — type inferred from answers later
-    const qMatchAuto = !qMatchTyped && line.match(/^\d+[.)]\s*(.+)/);
+    // Format 2 (no type): "1) text" or "1. text" — requires at least one space after
+    // the separator (\s+) to avoid matching answer options that start with a digit
+    const qMatchAuto = !qMatchTyped && line.match(/^\d+[.)]\s+(.+)/);
 
     if (qMatchTyped) {
       if (current) questions.push(current);
