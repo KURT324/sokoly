@@ -15,7 +15,7 @@ export interface ParsedQuestion {
 export async function parseDocxBuffer(buffer: Buffer): Promise<ParsedQuestion[]> {
   const { value: rawText } = await mammoth.extractRawText({ buffer });
 
-  console.log('[parse-docx] raw text from mammoth:\n---\n' + rawText + '\n---');
+  process.stdout.write('[parse-docx] raw text from mammoth:\n---\n' + rawText + '\n---\n');
 
   // Strip invisible Unicode chars (zero-width space, soft hyphen, BOM, etc.) that Word
   // embeds in "empty" paragraphs and that survive trim(), then skip genuinely blank lines
