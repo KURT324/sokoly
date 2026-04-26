@@ -1,0 +1,1 @@
+ALTER TYPE "MaterialType" ADD VALUE 'APK';

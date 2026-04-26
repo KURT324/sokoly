@@ -12,6 +12,7 @@ const TYPE_ICONS: Record<MaterialType, string> = {
   [MaterialType.IMAGE]: '🖼️',
   [MaterialType.LINK]: '🔗',
   [MaterialType.VIDEO]: '🎬',
+  [MaterialType.APK]: '📱',
 };
 
 const TYPE_LABELS: Record<MaterialType, string> = {
@@ -20,6 +21,7 @@ const TYPE_LABELS: Record<MaterialType, string> = {
   [MaterialType.IMAGE]: 'Изображение',
   [MaterialType.LINK]: 'Ссылка',
   [MaterialType.VIDEO]: 'Видео',
+  [MaterialType.APK]: 'APK',
 };
 
 
@@ -59,6 +61,12 @@ export function StudentDayDetailPage() {
       const viewUrl = daysApi.getMaterialViewUrl(dayId!, material.id);
       setImageViewer({ url: viewUrl, title: material.title });
       setSelected(null);
+      return;
+    }
+
+    if (material.type === MaterialType.APK) {
+      const viewUrl = daysApi.getMaterialViewUrl(dayId!, material.id);
+      window.open(viewUrl, '_blank', 'noopener,noreferrer');
       return;
     }
 
@@ -124,12 +132,12 @@ export function StudentDayDetailPage() {
                       <div className="font-medium text-gray-800 dark:text-slate-100 truncate">{m.title}</div>
                       <div className="text-xs text-gray-400 dark:text-slate-500">{TYPE_LABELS[m.type]}</div>
                     </div>
-                    {m.type !== MaterialType.LINK && m.type !== MaterialType.IMAGE && (
+                    {m.type !== MaterialType.LINK && m.type !== MaterialType.IMAGE && m.type !== MaterialType.APK && (
                       <span className="text-xs text-blue-600 dark:text-blue-400 shrink-0">
                         {isOpen ? 'Свернуть ↑' : 'Открыть ↓'}
                       </span>
                     )}
-                    {(m.type === MaterialType.LINK || m.type === MaterialType.IMAGE) && (
+                    {(m.type === MaterialType.LINK || m.type === MaterialType.IMAGE || m.type === MaterialType.APK) && (
                       <span className="text-xs text-blue-600 dark:text-blue-400 shrink-0">Открыть →</span>
                     )}
                   </button>

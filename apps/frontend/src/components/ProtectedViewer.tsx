@@ -8,7 +8,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 
 interface ProtectedViewerProps {
   url: string;
-  type: 'IMAGE' | 'PDF' | 'LINK' | 'DOC' | 'VIDEO';
+  type: 'IMAGE' | 'PDF' | 'LINK' | 'DOC' | 'VIDEO' | 'APK';
   title: string;
   onClose: () => void;
 }
@@ -154,6 +154,21 @@ export function ProtectedViewer({ url, type, title, onClose }: ProtectedViewerPr
               className="w-full rounded-lg"
               style={{ userSelect: 'none' }}
             />
+          </div>
+        )}
+
+        {type === 'APK' && (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">📱</div>
+            <p className="text-gray-300 mb-2 font-medium">APK</p>
+            <p className="text-gray-400 text-sm mb-6">{title}</p>
+            <a
+              href={url}
+              download
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors inline-block"
+            >
+              Скачать APK
+            </a>
           </div>
         )}
       </div>

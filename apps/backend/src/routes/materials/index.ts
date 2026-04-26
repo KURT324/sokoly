@@ -7,7 +7,7 @@ import { prisma } from '../../db';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 
-const ALLOWED_EXTS = new Set(['.pdf', '.doc', '.docx', '.mp4', '.avi', '.mov', '.mkv']);
+const ALLOWED_EXTS = new Set(['.pdf', '.doc', '.docx', '.mp4', '.avi', '.mov', '.mkv', '.apk']);
 
 const MIME: Record<string, string> = {
   '.pdf': 'application/pdf',
@@ -17,6 +17,7 @@ const MIME: Record<string, string> = {
   '.avi': 'video/x-msvideo',
   '.mov': 'video/quicktime',
   '.mkv': 'video/x-matroska',
+  '.apk': 'application/vnd.android.package-archive',
 };
 
 const VIDEO_EXTS = new Set(['.mp4', '.avi', '.mov', '.mkv']);
@@ -66,6 +67,17 @@ export async function materialsPublicRoutes(app: FastifyInstance) {
 
       return reply
         .header('Content-Length', String(fileSize))
+        .send(fsSync.createReadStream(filePath));
+    }
+
+    // APK — stream as download attachment
+    if (ext === '.apk') {
+      const stat = await fs.stat(filePath);
+      return reply
+        .header('Content-Type', mime)
+        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Length', String(stat.size))
+        .header('Cache-Control', 'no-store')
         .send(fsSync.createReadStream(filePath));
     }
 
@@ -130,6 +142,17 @@ export async function materialsPublicRoutes(app: FastifyInstance) {
 
       return reply
         .header('Content-Length', String(fileSize))
+        .send(fsSync.createReadStream(filePath));
+    }
+
+    // APK — stream as download attachment
+    if (ext === '.apk') {
+      const stat = await fs.stat(filePath);
+      return reply
+        .header('Content-Type', mime)
+        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Length', String(stat.size))
+        .header('Cache-Control', 'no-store')
         .send(fsSync.createReadStream(filePath));
     }
 

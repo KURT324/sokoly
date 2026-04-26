@@ -10,6 +10,7 @@ const TYPE_ICONS: Record<MaterialType, string> = {
   [MaterialType.IMAGE]: '🖼️',
   [MaterialType.LINK]: '🔗',
   [MaterialType.VIDEO]: '🎬',
+  [MaterialType.APK]: '📱',
 };
 
 function formatBytes(bytes: number | null): string {
@@ -61,6 +62,10 @@ export function MaterialLibraryPage() {
   const handlePreview = (item: LibraryItem) => {
     if (item.type === MaterialType.LINK) {
       window.open(item.url!, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (item.type === MaterialType.APK) {
+      window.open(`/api/material-library/${item.id}/view`, '_blank', 'noopener,noreferrer');
       return;
     }
     setPreviewId((prev) => (prev === item.id ? null : item.id));
@@ -125,11 +130,14 @@ export function MaterialLibraryPage() {
     const videoTypes = ['video/mp4', 'video/x-msvideo', 'video/quicktime', 'video/x-matroska'];
     for (const file of files) {
       const isVideo = videoTypes.includes(file.type) || /\.(mp4|avi|mov|mkv)$/i.test(file.name);
-      const maxSize = isVideo ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
+      const isApk = /\.apk$/i.test(file.name);
+      const maxSize = isApk ? 1024 * 1024 * 1024 : isVideo ? 500 * 1024 * 1024 : 50 * 1024 * 1024;
       if (file.size > maxSize) {
-        return setError(isVideo
-          ? `«${file.name}»: видео слишком большое. Максимум 500 МБ`
-          : `«${file.name}»: файл слишком большой. Максимум 50 МБ`);
+        return setError(isApk
+          ? `«${file.name}»: APK слишком большой. Максимум 1 ГБ`
+          : isVideo
+            ? `«${file.name}»: видео слишком большое. Максимум 500 МБ`
+            : `«${file.name}»: файл слишком большой. Максимум 50 МБ`);
       }
     }
     setError('');
@@ -237,7 +245,7 @@ export function MaterialLibraryPage() {
             <>
               <div className="text-3xl mb-2">📁</div>
               <p className="text-sm text-gray-600 dark:text-slate-400 mb-1">Перетащите файл или нажмите для выбора</p>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">PDF, DOCX, JPG, PNG, WEBP — до 50 МБ &nbsp;|&nbsp; MP4, AVI, MOV, MKV — до 500 МБ</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">PDF, DOCX, JPG, PNG, WEBP — до 50 МБ &nbsp;|&nbsp; MP4, AVI, MOV, MKV — до 500 МБ &nbsp;|&nbsp; APK — до 1 ГБ</p>
 
               {/* Folder for upload */}
               <div className="flex justify-center mb-4">
@@ -277,7 +285,7 @@ export function MaterialLibraryPage() {
             type="file"
             multiple
             className="hidden"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.mp4,.avi,.mov,.mkv"
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.mp4,.avi,.mov,.mkv,.apk"
             onChange={(e) => {
               const files = Array.from(e.target.files ?? []);
               if (files.length > 0) handleFilesUpload(files);
@@ -463,6 +471,11 @@ export function MaterialLibraryPage() {
                                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
                                 Открыть →
                               </a>
+                            ) : item.type === MaterialType.APK && item.storage_path ? (
+                              <button onClick={() => handlePreview(item)}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                                Скачать →
+                              </button>
                             ) : item.storage_path && (
                               <button onClick={() => handlePreview(item)}
                                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline">

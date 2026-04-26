@@ -11,6 +11,7 @@ import { processImageFile } from '../../services/imageProcessor';
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 const VIDEO_MAX_SIZE = 500 * 1024 * 1024;
+const APK_MAX_SIZE   = 1024 * 1024 * 1024; // 1 GB for APK
 
 const EXT_TO_TYPE: Record<string, MaterialType> = {
   '.pdf': MaterialType.PDF,
@@ -24,6 +25,7 @@ const EXT_TO_TYPE: Record<string, MaterialType> = {
   '.avi': MaterialType.VIDEO,
   '.mov': MaterialType.VIDEO,
   '.mkv': MaterialType.VIDEO,
+  '.apk': MaterialType.APK,
 };
 
 const VIDEO_EXTS = new Set(['.mp4', '.avi', '.mov', '.mkv']);
@@ -67,7 +69,7 @@ export async function materialLibraryRoutes(app: FastifyInstance) {
       return reply.status(201).send(item);
     }
 
-    const data = await request.file({ limits: { fileSize: VIDEO_MAX_SIZE } });
+    const data = await request.file({ limits: { fileSize: APK_MAX_SIZE } });
     if (!data) return reply.status(400).send({ error: 'No file provided' });
 
     const ext = path.extname(data.filename).toLowerCase();
@@ -272,6 +274,16 @@ export async function materialLibraryRoutes(app: FastifyInstance) {
 
       return reply
         .header('Content-Length', String(fileSize))
+        .send(fsSync.createReadStream(filePath));
+    }
+
+    if (ext === '.apk') {
+      const stat = await fs.stat(filePath);
+      return reply
+        .header('Content-Type', 'application/vnd.android.package-archive')
+        .header('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`)
+        .header('Content-Length', String(stat.size))
+        .header('Cache-Control', 'no-store')
         .send(fsSync.createReadStream(filePath));
     }
 

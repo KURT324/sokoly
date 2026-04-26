@@ -16,6 +16,7 @@ const DAY_TTL  = 120;
 
 const STORAGE_PATH = process.env.STORAGE_PATH || '/app/storage';
 const VIDEO_MAX_SIZE = 500 * 1024 * 1024;  // 500 MB for video
+const APK_MAX_SIZE   = 1024 * 1024 * 1024; // 1 GB for APK
 const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50 MB for other files
 
 const EXT_TO_TYPE: Record<string, MaterialType> = {
@@ -30,6 +31,7 @@ const EXT_TO_TYPE: Record<string, MaterialType> = {
   '.avi': MaterialType.VIDEO,
   '.mov': MaterialType.VIDEO,
   '.mkv': MaterialType.VIDEO,
+  '.apk': MaterialType.APK,
 };
 
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
@@ -176,7 +178,7 @@ export async function daysRoutes(app: FastifyInstance) {
     }
 
     // Peek at filename from multipart headers to decide size limit
-    const data = await request.file({ limits: { fileSize: VIDEO_MAX_SIZE } });
+    const data = await request.file({ limits: { fileSize: APK_MAX_SIZE } });
     if (!data) return reply.status(400).send({ error: 'No file provided' });
 
     const ext = path.extname(data.filename).toLowerCase();
@@ -322,6 +324,17 @@ export async function daysRoutes(app: FastifyInstance) {
           .header('Content-Length', String(fileSize))
           .send(stream);
       }
+    }
+
+    // APK — stream as attachment (no buffering large files)
+    if (ext === '.apk') {
+      const stat = await fs.stat(filePath);
+      return reply
+        .header('Content-Type', 'application/vnd.android.package-archive')
+        .header('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`)
+        .header('Content-Length', String(stat.size))
+        .header('Cache-Control', 'no-store')
+        .send(fsSync.createReadStream(filePath));
     }
 
     let fileBuffer: Buffer;
