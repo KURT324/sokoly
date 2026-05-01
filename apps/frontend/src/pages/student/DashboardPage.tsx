@@ -126,8 +126,8 @@ function TestRow({ test, onClick }: { test: Test; onClick: () => void }) {
   const submission = test.submissions?.[0];
 
   const getStatus = () => {
-    if (!submission) return { label: 'Не сдан', cls: 'badge-gray'  };
-    return                  { label: 'Сдан',    cls: 'badge-green' };
+    if (!submission) return { label: 'Назначен',  cls: 'badge-yellow' };
+    return                  { label: 'Завершён',  cls: 'badge-green'  };
   };
 
   const { label, cls } = getStatus();
