@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Layout } from '../../components/Layout';
-import { testsApi, CohortStudent, ParsedQuestion } from '../../api/tests';
+import { testsApi, ParsedQuestion } from '../../api/tests';
 import { cohortsApi, Cohort } from '../../api/cohorts';
 
 type QuestionType = 'SINGLE' | 'MULTIPLE' | 'OPEN_TEXT' | 'DRAWING';
@@ -43,7 +43,6 @@ interface VariantForm {
   localId: string;
   name: string;
   questions: QuestionForm[];
-  student_ids: string[];
 }
 
 function makeId() {
@@ -66,7 +65,7 @@ function defaultQuestion(type: QuestionType): QuestionForm {
 }
 
 function defaultVariant(index: number): VariantForm {
-  return { localId: makeId(), name: `Вариант ${index + 1}`, questions: [], student_ids: [] };
+  return { localId: makeId(), name: `Вариант ${index + 1}`, questions: [] };
 }
 
 function typeLabel(t: QuestionType) {
@@ -116,7 +115,7 @@ function SortableQuestion({
             <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
               Вопрос {index + 1} — {typeLabel(question.type)}
             </span>
-            <button onClick={onRemove} className="text-red-400 hover:text-red-600 dark:text-red-400 text-sm">
+            <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-sm">
               Удалить
             </button>
           </div>
@@ -239,12 +238,9 @@ export function TestCreatePage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [title, setTitle] = useState('');
   const [cohortId, setCohortId] = useState('');
-  const [dayId, setDayId] = useState('');
   const [timeLimitMin, setTimeLimitMin] = useState('');
-  const [showResultImmediately, setShowResultImmediately] = useState(true);
   const [variants, setVariants] = useState<VariantForm[]>([defaultVariant(0)]);
   const [activeVariantIdx, setActiveVariantIdx] = useState(0);
-  const [cohortStudents, setCohortStudents] = useState<CohortStudent[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [importing, setImporting] = useState(false);
@@ -263,30 +259,20 @@ export function TestCreatePage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!cohortId) { setCohortStudents([]); return; }
-    testsApi.getCohortStudents(cohortId).then((r) => setCohortStudents(r.data));
-  }, [cohortId]);
-
-  const selectedCohort = cohorts.find((c) => c.id === cohortId);
   const activeVariant = variants[activeVariantIdx] ?? variants[0];
 
   const updateVariant = (localId: string, patch: Partial<VariantForm>) =>
     setVariants((prev) => prev.map((v) => (v.localId === localId ? { ...v, ...patch } : v)));
 
   const addVariant = () => {
-    const newVariant = defaultVariant(variants.length);
-    setVariants((prev) => [...prev, newVariant]);
+    setVariants((prev) => [...prev, defaultVariant(prev.length)]);
     setActiveVariantIdx(variants.length);
   };
 
   const removeVariant = (localId: string) => {
     if (variants.length === 1) return;
-    const idx = variants.findIndex((v) => v.localId === localId);
     setVariants((prev) => prev.filter((v) => v.localId !== localId));
     setActiveVariantIdx((prev) => Math.min(prev, variants.length - 2));
-    // Free up students from removed variant — no action needed, they just won't be assigned
-    void idx;
   };
 
   const addQuestion = (type: QuestionType) => {
@@ -314,34 +300,6 @@ export function TestCreatePage() {
         questions: arrayMove(activeVariant.questions, oldIndex, newIndex),
       });
     }
-  };
-
-  // Toggle student assignment: if student is in another variant, move them; if in this, remove; if unassigned, add
-  const toggleStudent = (studentId: string) => {
-    const currentVariantLocalId = activeVariant.localId;
-    const inThisVariant = activeVariant.student_ids.includes(studentId);
-
-    setVariants((prev) =>
-      prev.map((v) => {
-        if (v.localId === currentVariantLocalId) {
-          return {
-            ...v,
-            student_ids: inThisVariant
-              ? v.student_ids.filter((id) => id !== studentId)
-              : [...v.student_ids, studentId],
-          };
-        }
-        // Remove from other variants (one variant per student per test)
-        return { ...v, student_ids: v.student_ids.filter((id) => id !== studentId) };
-      }),
-    );
-  };
-
-  const getStudentVariant = (studentId: string): string | null => {
-    for (const v of variants) {
-      if (v.student_ids.includes(studentId)) return v.localId;
-    }
-    return null;
   };
 
   const handleImportDocx = async (file: File) => {
@@ -392,12 +350,9 @@ export function TestCreatePage() {
       await testsApi.createTest({
         title: title.trim(),
         cohort_id: cohortId,
-        day_id: dayId || undefined,
         time_limit_min: timeLimitMin ? Number(timeLimitMin) : undefined,
-        show_result_immediately: showResultImmediately,
         variants: variants.map((v) => ({
           name: v.name,
-          student_ids: v.student_ids,
           questions: v.questions.map((q, i) => ({
             type: q.type,
             question_text: q.question_text,
@@ -422,10 +377,7 @@ export function TestCreatePage() {
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Создать тест</h1>
-          <button
-            onClick={() => navigate('/teacher/tests')}
-            className="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700"
-          >
+          <button onClick={() => navigate('/teacher/tests')} className="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700">
             ← Назад
           </button>
         </div>
@@ -448,7 +400,7 @@ export function TestCreatePage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Группа *</label>
               <select
                 value={cohortId}
-                onChange={(e) => { setCohortId(e.target.value); setDayId(''); }}
+                onChange={(e) => setCohortId(e.target.value)}
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Выберите группу</option>
@@ -459,23 +411,6 @@ export function TestCreatePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Учебный день (опционально)</label>
-              <select
-                value={dayId}
-                onChange={(e) => setDayId(e.target.value)}
-                disabled={!cohortId}
-                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              >
-                <option value="">Не привязан</option>
-                {selectedCohort?.days.map((d) => (
-                  <option key={d.id} value={d.id}>День {d.day_number}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Лимит времени (мин, опционально)</label>
               <input
                 type="number"
@@ -485,18 +420,6 @@ export function TestCreatePage() {
                 min={1}
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-
-            <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showResultImmediately}
-                  onChange={(e) => setShowResultImmediately(e.target.checked)}
-                  className="accent-blue-600 w-4 h-4"
-                />
-                <span className="text-sm text-gray-700 dark:text-slate-200">Показать результат сразу</span>
-              </label>
             </div>
           </div>
         </div>
@@ -530,10 +453,8 @@ export function TestCreatePage() {
             </button>
           </div>
 
-          {/* Active variant editor */}
           {activeVariant && (
             <div className="space-y-4">
-              {/* Variant name */}
               <div className="flex items-center gap-3">
                 <input
                   type="text"
@@ -603,53 +524,13 @@ export function TestCreatePage() {
                   </p>
                 )}
               </div>
-
-              {/* Student assignment */}
-              {cohortStudents.length > 0 && (
-                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-3">
-                    Назначить курсантов на этот вариант
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                    {cohortStudents.map((s) => {
-                      const assignedVariantLocalId = getStudentVariant(s.id);
-                      const inThis = assignedVariantLocalId === activeVariant.localId;
-                      const inOther = assignedVariantLocalId !== null && !inThis;
-                      const otherVariant = inOther ? variants.find((v) => v.localId === assignedVariantLocalId) : null;
-                      return (
-                        <label key={s.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
-                          inThis
-                            ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
-                            : 'border-transparent hover:bg-gray-50 dark:hover:bg-slate-700/50'
-                        }`}>
-                          <input
-                            type="checkbox"
-                            checked={inThis}
-                            onChange={() => toggleStudent(s.id)}
-                            className="accent-blue-600"
-                          />
-                          <span className="text-sm text-gray-800 dark:text-slate-100 flex-1 min-w-0 truncate">{s.callsign}</span>
-                          {inOther && (
-                            <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">{otherVariant?.name}</span>
-                          )}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
-                    {activeVariant.student_ids.length} из {cohortStudents.length} назначено
-                  </p>
-                </div>
-              )}
-
-              {!cohortId && (
-                <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-2">
-                  Выберите группу выше, чтобы назначить курсантов на вариант
-                </p>
-              )}
             </div>
           )}
         </div>
+
+        <p className="text-xs text-gray-400 dark:text-slate-500">
+          После создания назначьте тест курсантам через кнопку «Назначить» в списке тестов.
+        </p>
 
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg px-4 py-3 text-sm">

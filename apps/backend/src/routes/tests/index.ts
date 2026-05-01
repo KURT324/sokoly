@@ -20,11 +20,10 @@ type VariantInput = {
     order_index: number;
     answers?: Array<{ answer_text: string; is_correct: boolean }>;
   }>;
-  student_ids: string[];
 };
 
 export async function testsRoutes(app: FastifyInstance) {
-  // POST /api/tests/upload-image — upload drawing background image
+  // POST /api/tests/upload-image
   app.post('/upload-image', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
@@ -42,7 +41,7 @@ export async function testsRoutes(app: FastifyInstance) {
     return { image_path: filename };
   });
 
-  // GET /api/tests/question-images/:filename — serve drawing background
+  // GET /api/tests/question-images/:filename
   app.get('/question-images/:filename', { preHandler: authGuard }, async (request, reply) => {
     const { filename } = request.params as { filename: string };
     const filePath = path.join(STORAGE_PATH, 'questions', path.basename(filename));
@@ -56,7 +55,7 @@ export async function testsRoutes(app: FastifyInstance) {
     }
   });
 
-  // GET /api/tests/submission-drawings/:filename — serve student drawing (teacher only)
+  // GET /api/tests/submission-drawings/:filename
   app.get('/submission-drawings/:filename', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
@@ -70,7 +69,7 @@ export async function testsRoutes(app: FastifyInstance) {
     }
   });
 
-  // POST /api/tests/parse-docx — parse Word file into questions array (does not save)
+  // POST /api/tests/parse-docx
   app.post('/parse-docx', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
@@ -99,7 +98,7 @@ export async function testsRoutes(app: FastifyInstance) {
     return { questions };
   });
 
-  // GET /api/tests/cohort-students/:cohortId — list students in cohort (for variant assignment)
+  // GET /api/tests/cohort-students/:cohortId
   app.get('/cohort-students/:cohortId', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request) => {
@@ -111,27 +110,23 @@ export async function testsRoutes(app: FastifyInstance) {
     });
   });
 
-  // POST /api/tests — create test with variants
+  // POST /api/tests — create test (library entry, no day binding, no show_result, no student assignment)
   app.post('/', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
-    const { title, day_id, cohort_id, time_limit_min, show_result_immediately, variants } =
-      request.body as {
-        title: string;
-        day_id?: string;
-        cohort_id: string;
-        time_limit_min?: number;
-        show_result_immediately?: boolean;
-        variants: VariantInput[];
-      };
+    const { title, cohort_id, time_limit_min, variants } = request.body as {
+      title: string;
+      cohort_id: string;
+      time_limit_min?: number;
+      variants: VariantInput[];
+    };
 
     const test = await prisma.test.create({
       data: {
         title,
-        day_id: day_id || null,
         cohort_id,
         time_limit_min: time_limit_min || null,
-        show_result_immediately: show_result_immediately ?? true,
+        show_result_immediately: false,
         created_by_id: request.user!.id,
         variants: {
           create: variants.map((v) => ({
@@ -159,25 +154,71 @@ export async function testsRoutes(app: FastifyInstance) {
       },
     });
 
-    // Create variant assignments (after variants are created with their IDs)
-    for (let i = 0; i < variants.length; i++) {
-      const variant = test.variants[i];
-      if (variants[i].student_ids?.length) {
-        await prisma.testVariantAssignment.createMany({
-          data: variants[i].student_ids.map((student_id) => ({
-            variant_id: variant.id,
-            test_id: test.id,
-            student_id,
-          })),
-          skipDuplicates: true,
-        });
-      }
-    }
-
     return reply.status(201).send(test);
   });
 
-  // PATCH /api/tests/:id/toggle-open — teacher: toggle is_open
+  // POST /api/tests/:id/assign — assign variants to students or whole cohort
+  app.post('/:id/assign', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { assignments, variant_id, cohort_id } = request.body as {
+      assignments?: Array<{ variant_id: string; student_ids: string[] }>;
+      variant_id?: string;
+      cohort_id?: string;
+    };
+
+    const test = await prisma.test.findUnique({
+      where: { id },
+      select: { id: true, created_by_id: true },
+    });
+    if (!test) return reply.status(404).send({ error: 'Not Found' });
+    if (request.user!.role === UserRole.TEACHER && test.created_by_id !== request.user!.id) {
+      return reply.status(403).send({ error: 'Forbidden' });
+    }
+
+    if (variant_id && cohort_id) {
+      const students = await prisma.user.findMany({
+        where: { role: UserRole.STUDENT, cohort_id, is_active: true },
+        select: { id: true },
+      });
+      await prisma.testVariantAssignment.createMany({
+        data: students.map((s) => ({ variant_id, test_id: id, student_id: s.id })),
+        skipDuplicates: true,
+      });
+      return { success: true, count: students.length };
+    }
+
+    if (assignments?.length) {
+      for (const a of assignments) {
+        await prisma.testVariantAssignment.createMany({
+          data: a.student_ids.map((sid) => ({ variant_id: a.variant_id, test_id: id, student_id: sid })),
+          skipDuplicates: true,
+        });
+      }
+      return { success: true };
+    }
+
+    return reply.status(400).send({ error: 'Provide assignments or variant_id+cohort_id' });
+  });
+
+  // DELETE /api/tests/:id/assignments/:studentId — remove a student's assignment
+  app.delete('/:id/assignments/:studentId', {
+    preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
+  }, async (request, reply) => {
+    const { id, studentId } = request.params as { id: string; studentId: string };
+
+    const test = await prisma.test.findUnique({ where: { id }, select: { created_by_id: true } });
+    if (!test) return reply.status(404).send({ error: 'Not Found' });
+    if (request.user!.role === UserRole.TEACHER && test.created_by_id !== request.user!.id) {
+      return reply.status(403).send({ error: 'Forbidden' });
+    }
+
+    await prisma.testVariantAssignment.deleteMany({ where: { test_id: id, student_id: studentId } });
+    return { success: true };
+  });
+
+  // PATCH /api/tests/:id/toggle-open
   app.patch('/:id/toggle-open', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
@@ -203,7 +244,7 @@ export async function testsRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  // GET /api/tests/:id/activity — toggle history
+  // GET /api/tests/:id/activity
   app.get('/:id/activity', { preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN) }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const test = await prisma.test.findUnique({ where: { id }, select: { id: true } });
@@ -221,11 +262,12 @@ export async function testsRoutes(app: FastifyInstance) {
     const user = request.user!;
 
     if (user.role === UserRole.STUDENT) {
-      if (!user.cohort_id) return reply.status(400).send({ error: 'No cohort' });
       const tests = await prisma.test.findMany({
-        where: { cohort_id: user.cohort_id, is_open: true },
+        where: {
+          is_open: true,
+          variant_assignments: { some: { student_id: user.id } },
+        },
         include: {
-          _count: { select: { submissions: true } },
           submissions: {
             where: { student_id: user.id },
             select: { id: true, auto_score: true, manual_score: true, submitted_at: true },
@@ -244,15 +286,28 @@ export async function testsRoutes(app: FastifyInstance) {
       include: {
         _count: { select: { submissions: true } },
         cohort: { select: { id: true, name: true } },
-        day: { select: { id: true, day_number: true } },
-        variants: { select: { id: true, name: true, _count: { select: { assignments: true } } } },
+        variants: {
+          select: {
+            id: true,
+            name: true,
+            _count: { select: { assignments: true, questions: true } },
+            assignments: {
+              include: {
+                student: { select: { id: true, callsign: true } },
+              },
+            },
+          },
+        },
+        submissions: {
+          select: { student_id: true, auto_score: true, manual_score: true, submitted_at: true },
+        },
       },
       orderBy: { created_at: 'desc' },
     });
     return tests;
   });
 
-  // GET /api/tests/:id — get test detail
+  // GET /api/tests/:id — detail
   app.get('/:id', { preHandler: authGuard }, async (request, reply) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
@@ -260,20 +315,11 @@ export async function testsRoutes(app: FastifyInstance) {
     if (user.role === UserRole.STUDENT) {
       const test = await prisma.test.findUnique({
         where: { id },
-        select: {
-          id: true,
-          title: true,
-          cohort_id: true,
-          time_limit_min: true,
-          show_result_immediately: true,
-          created_at: true,
-        },
+        select: { id: true, title: true, cohort_id: true, time_limit_min: true, created_at: true },
       });
 
       if (!test) return reply.status(404).send({ error: 'Not Found' });
-      if (test.cohort_id !== user.cohort_id) return reply.status(403).send({ error: 'Forbidden' });
 
-      // Find which variant this student is assigned to
       const assignment = await prisma.testVariantAssignment.findUnique({
         where: { test_id_student_id: { test_id: id, student_id: user.id } },
         include: {
@@ -292,7 +338,6 @@ export async function testsRoutes(app: FastifyInstance) {
         return { ...test, assigned: false };
       }
 
-      // Strip is_correct from answers
       const variant = {
         ...assignment.variant,
         questions: assignment.variant.questions.map((q) => ({
@@ -304,7 +349,6 @@ export async function testsRoutes(app: FastifyInstance) {
       return { ...test, assigned: true, variant };
     }
 
-    // Teacher / Admin: full data
     const test = await prisma.test.findUnique({
       where: { id },
       include: {
@@ -321,20 +365,17 @@ export async function testsRoutes(app: FastifyInstance) {
     return test;
   });
 
-  // PUT /api/tests/:id — update test (full replace of variants + assignments)
+  // PUT /api/tests/:id — full replace of variants
   app.put('/:id', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { title, day_id, cohort_id, time_limit_min, show_result_immediately, variants } =
-      request.body as {
-        title: string;
-        day_id?: string;
-        cohort_id: string;
-        time_limit_min?: number;
-        show_result_immediately?: boolean;
-        variants: VariantInput[];
-      };
+    const { title, cohort_id, time_limit_min, variants } = request.body as {
+      title: string;
+      cohort_id: string;
+      time_limit_min?: number;
+      variants: VariantInput[];
+    };
 
     const existingTest = await prisma.test.findUnique({ where: { id }, select: { created_by_id: true } });
     if (!existingTest) return reply.status(404).send({ error: 'Not Found' });
@@ -342,17 +383,14 @@ export async function testsRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'Forbidden' });
     }
 
-    // Delete all existing variants (cascades to questions, answers, assignments)
     await prisma.testVariant.deleteMany({ where: { test_id: id } });
 
     const test = await prisma.test.update({
       where: { id },
       data: {
         title,
-        day_id: day_id || null,
         cohort_id,
         time_limit_min: time_limit_min || null,
-        show_result_immediately: show_result_immediately ?? true,
         variants: {
           create: variants.map((v) => ({
             name: v.name,
@@ -378,21 +416,6 @@ export async function testsRoutes(app: FastifyInstance) {
         },
       },
     });
-
-    // Recreate assignments
-    for (let i = 0; i < variants.length; i++) {
-      const variant = test.variants[i];
-      if (variants[i].student_ids?.length) {
-        await prisma.testVariantAssignment.createMany({
-          data: variants[i].student_ids.map((student_id) => ({
-            variant_id: variant.id,
-            test_id: id,
-            student_id,
-          })),
-          skipDuplicates: true,
-        });
-      }
-    }
 
     return test;
   });
@@ -427,15 +450,9 @@ export async function testsRoutes(app: FastifyInstance) {
       variant_id: string;
     };
 
-    const test = await prisma.test.findUnique({
-      where: { id },
-      select: { id: true, cohort_id: true, show_result_immediately: true },
-    });
-
+    const test = await prisma.test.findUnique({ where: { id }, select: { id: true } });
     if (!test) return reply.status(404).send({ error: 'Not Found' });
-    if (test.cohort_id !== user.cohort_id) return reply.status(403).send({ error: 'Forbidden' });
 
-    // Verify student is assigned to this variant
     const assignment = await prisma.testVariantAssignment.findUnique({
       where: { test_id_student_id: { test_id: id, student_id: user.id } },
     });
@@ -482,7 +499,6 @@ export async function testsRoutes(app: FastifyInstance) {
         if (studentAnswer?.drawing_data) {
           await fs.mkdir(path.join(STORAGE_PATH, 'drawings'), { recursive: true });
           const base64 = studentAnswer.drawing_data.replace(/^data:image\/\w+;base64,/, '');
-          // Reject drawings larger than 10 MB decoded (~13.4 MB base64)
           if (base64.length > 14_000_000) {
             return reply.status(400).send({ error: 'Drawing data too large (max 10 MB)' });
           }
@@ -514,28 +530,10 @@ export async function testsRoutes(app: FastifyInstance) {
       },
     });
 
-    if (test.show_result_immediately) {
-      return {
-        submission,
-        show_result: true,
-        auto_score: autoScore,
-        answers_detail: answersJson,
-        questions: variant.questions.map((q) => ({
-          id: q.id,
-          question_text: q.question_text,
-          type: q.type,
-          correct_answer_ids:
-            q.type === QuestionType.SINGLE || q.type === QuestionType.MULTIPLE
-              ? q.answers.filter((a) => a.is_correct).map((a) => a.id)
-              : undefined,
-        })),
-      };
-    }
-
     return { submission, show_result: false };
   });
 
-  // GET /api/tests/:id/results — teacher: all submissions
+  // GET /api/tests/:id/results
   app.get('/:id/results', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
@@ -551,22 +549,7 @@ export async function testsRoutes(app: FastifyInstance) {
     return submissions;
   });
 
-  // GET /api/tests/:id/results/my — student own result
-  app.get('/:id/results/my', {
-    preHandler: roleGuard(UserRole.STUDENT),
-  }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const test = await prisma.test.findUnique({ where: { id }, select: { cohort_id: true } });
-    if (!test) return reply.status(404).send({ error: 'Not Found' });
-    if (test.cohort_id !== request.user!.cohort_id) return reply.status(403).send({ error: 'Forbidden' });
-    const submission = await prisma.testSubmission.findUnique({
-      where: { test_id_student_id: { test_id: id, student_id: request.user!.id } },
-    });
-    if (!submission) return reply.status(404).send({ error: 'Not Found' });
-    return submission;
-  });
-
-  // PATCH /api/tests/:id/submissions/:subId/score — teacher manual score
+  // PATCH /api/tests/:id/submissions/:subId/score
   app.patch('/:id/submissions/:subId/score', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {

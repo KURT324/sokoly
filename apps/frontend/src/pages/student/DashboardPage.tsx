@@ -126,10 +126,8 @@ function TestRow({ test, onClick }: { test: Test; onClick: () => void }) {
   const submission = test.submissions?.[0];
 
   const getStatus = () => {
-    if (!submission)                                         return { label: 'Не пройден',  cls: 'badge-gray'   };
-    if (submission.manual_score != null || submission.auto_score != null)
-                                                             return { label: 'Пройден',      cls: 'badge-green'  };
-    return                                                          { label: 'На проверке', cls: 'badge-yellow' };
+    if (!submission) return { label: 'Не сдан', cls: 'badge-gray'  };
+    return                  { label: 'Сдан',    cls: 'badge-green' };
   };
 
   const { label, cls } = getStatus();

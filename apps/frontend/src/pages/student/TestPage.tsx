@@ -95,48 +95,13 @@ export function StudentTestPage() {
     return (
       <Layout>
         <div className="max-w-2xl mx-auto space-y-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Результаты</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Тест завершён</h1>
 
-          {result.show_result && result.auto_score != null ? (
-            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 space-y-4">
-              <div className="text-center">
-                {(() => {
-                  const autoQs = result.questions?.filter(q => q.type === 'SINGLE' || q.type === 'MULTIPLE') ?? [];
-                  const correct = result.answers_detail?.filter(a => a.is_correct === true).length ?? 0;
-                  return (
-                    <>
-                      <div className="text-5xl font-bold text-blue-600 dark:text-blue-400">{correct} из {autoQs.length}</div>
-                      <p className="text-gray-500 dark:text-slate-400 mt-2">правильных ответов</p>
-                    </>
-                  );
-                })()}
-              </div>
-
-              <div className="space-y-3 mt-4">
-                {result.questions?.filter((q) => q.type === 'SINGLE' || q.type === 'MULTIPLE').map((q) => {
-                  const detail = result.answers_detail?.find((a) => a.question_id === q.id);
-                  const isCorrect = detail?.is_correct;
-                  return (
-                    <div key={q.id} className={`flex items-start gap-3 p-3 rounded-lg ${isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
-                      <span className="text-lg">{isCorrect ? '✅' : '❌'}</span>
-                      <p className="text-sm text-gray-800 dark:text-slate-100">{q.question_text}</p>
-                    </div>
-                  );
-                })}
-                {result.questions?.some((q) => q.type === 'OPEN_TEXT' || q.type === 'DRAWING') && (
-                  <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-3 py-2">
-                    Некоторые вопросы ждут проверки преподавателем
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center">
-              <div className="text-4xl mb-3">📬</div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">Ответы отправлены</h2>
-              <p className="text-gray-500 dark:text-slate-400">Ждите проверки инструктора</p>
-            </div>
-          )}
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-8 text-center">
+            <div className="text-4xl mb-3">📬</div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">Ответы отправлены</h2>
+            <p className="text-gray-500 dark:text-slate-400">Ждите проверки инструктора</p>
+          </div>
 
           <button
             onClick={() => navigate('/student/dashboard')}

@@ -19,11 +19,15 @@ export interface TestQuestion {
 
 export interface TestVariant {
   id: string;
-  test_id: string;
+  test_id?: string;
   name: string;
   questions?: TestQuestion[];
-  assignments?: Array<{ student_id: string; student?: { id: string; callsign: string } }>;
-  _count?: { assignments: number };
+  assignments?: Array<{
+    student_id: string;
+    student?: { id: string; callsign: string };
+    variant_id?: string;
+  }>;
+  _count?: { assignments: number; questions: number };
 }
 
 export interface CohortStudent {
@@ -35,27 +39,26 @@ export interface CohortStudent {
 export interface Test {
   id: string;
   title: string;
-  day_id?: string | null;
   cohort_id: string;
   time_limit_min?: number | null;
-  show_result_immediately: boolean;
   is_open: boolean;
   created_at: string;
   variants: TestVariant[];
   _count?: { submissions: number };
-  submissions?: Array<{ id: string; auto_score?: number | null; manual_score?: number | null; submitted_at: string }>;
-  variant_assignments?: Array<{ id: string; variant_id: string }>;
+  submissions?: Array<{
+    student_id: string;
+    auto_score?: number | null;
+    manual_score?: number | null;
+    submitted_at: string;
+  }>;
   cohort?: { id: string; name: string };
-  day?: { id: string; day_number: number } | null;
 }
 
-// Response from GET /tests/:id for a student
 export interface StudentTestDetail {
   id: string;
   title: string;
   cohort_id: string;
   time_limit_min?: number | null;
-  show_result_immediately: boolean;
   created_at: string;
   assigned: boolean;
   variant?: TestVariant;
@@ -76,10 +79,7 @@ export interface TestSubmission {
 
 export interface SubmitResult {
   submission: TestSubmission;
-  show_result: boolean;
-  auto_score?: number | null;
-  answers_detail?: Array<{ question_id: string; answer_ids?: string[]; is_correct?: boolean; text?: string; drawing_path?: string | null }>;
-  questions?: Array<{ id: string; question_text: string; type: QuestionType; correct_answer_ids?: string[] }>;
+  show_result: false;
 }
 
 export interface ParsedQuestion {
@@ -111,12 +111,20 @@ export const testsApi = {
   updateTest: (id: string, data: any) => client.put<Test>(`/tests/${id}`, data),
   deleteTest: (id: string) => client.delete(`/tests/${id}`),
   toggleOpen: (id: string) => client.patch<{ id: string; is_open: boolean }>(`/tests/${id}/toggle-open`),
+
+  assignTest: (id: string, data: {
+    assignments?: Array<{ variant_id: string; student_ids: string[] }>;
+    variant_id?: string;
+    cohort_id?: string;
+  }) => client.post<{ success: boolean; count?: number }>(`/tests/${id}/assign`, data),
+
+  unassignStudent: (testId: string, studentId: string) =>
+    client.delete(`/tests/${testId}/assignments/${studentId}`),
+
   submitTest: (id: string, answers: any[], variant_id: string) =>
     client.post<SubmitResult>(`/tests/${id}/submit`, { answers, variant_id }),
 
   getResults: (id: string) => client.get<TestSubmission[]>(`/tests/${id}/results`),
-  getMyResult: (id: string) => client.get<TestSubmission>(`/tests/${id}/results/my`),
-
   updateScore: (testId: string, subId: string, manual_score: number) =>
     client.patch<TestSubmission>(`/tests/${testId}/submissions/${subId}/score`, { manual_score }),
 
