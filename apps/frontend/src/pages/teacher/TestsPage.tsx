@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { testsApi, Test, CohortStudent } from '../../api/tests';
+import { cohortsApi, Cohort } from '../../api/cohorts';
 
 type Tab = 'library' | 'assignments';
 
@@ -9,11 +10,13 @@ export function TeacherTestsPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('library');
   const [tests, setTests] = useState<Test[]>([]);
+  const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Assignment modal state
   const [assigningTest, setAssigningTest] = useState<Test | null>(null);
   const [assignVariantId, setAssignVariantId] = useState('');
+  const [assignCohortId, setAssignCohortId] = useState('');
   const [assignMode, setAssignMode] = useState<'cohort' | 'students'>('cohort');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [cohortStudents, setCohortStudents] = useState<CohortStudent[]>([]);
@@ -26,7 +29,20 @@ export function TeacherTestsPage() {
   const load = () =>
     testsApi.getTests().then((r) => setTests(r.data)).finally(() => setLoading(false));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    cohortsApi.getCohorts().then((r) => setCohorts(r.data));
+  }, []);
+
+  // Load students when cohort is selected in modal
+  useEffect(() => {
+    if (assignCohortId) {
+      setCohortStudents([]);
+      testsApi.getCohortStudents(assignCohortId).then((r) => setCohortStudents(r.data));
+    } else {
+      setCohortStudents([]);
+    }
+  }, [assignCohortId]);
 
   const handleDelete = async (id: string, title: string) => {
     if (!confirm(`Удалить тест "${title}"?`)) return;
@@ -42,17 +58,17 @@ export function TeacherTestsPage() {
   const openAssignModal = (test: Test) => {
     setAssigningTest(test);
     setAssignVariantId(test.variants?.[0]?.id ?? '');
+    setAssignCohortId('');
     setAssignMode('cohort');
     setSelectedStudentIds([]);
+    setCohortStudents([]);
     setAssignError('');
-    if (test.cohort_id) {
-      testsApi.getCohortStudents(test.cohort_id).then((r) => setCohortStudents(r.data));
-    }
   };
 
   const closeAssignModal = () => {
     setAssigningTest(null);
     setCohortStudents([]);
+    setAssignCohortId('');
   };
 
   const handleAssign = async () => {
@@ -61,11 +77,19 @@ export function TeacherTestsPage() {
     setAssignError('');
     try {
       if (assignMode === 'cohort') {
+        if (!assignCohortId) {
+          setAssignError('Выберите группу');
+          return;
+        }
         await testsApi.assignTest(assigningTest.id, {
           variant_id: assignVariantId,
-          cohort_id: assigningTest.cohort_id,
+          cohort_id: assignCohortId,
         });
       } else {
+        if (!assignCohortId) {
+          setAssignError('Выберите группу');
+          return;
+        }
         if (selectedStudentIds.length === 0) {
           setAssignError('Выберите хотя бы одного курсанта');
           return;
@@ -174,7 +198,6 @@ export function TeacherTestsPage() {
                   <thead className="bg-gray-50 dark:bg-slate-700/30 border-b border-gray-200 dark:border-slate-700">
                     <tr>
                       <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Название</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Группа</th>
                       <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Назначено</th>
                       <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Прошли</th>
                       <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-slate-400">Доступ</th>
@@ -189,7 +212,6 @@ export function TeacherTestsPage() {
                       return (
                         <tr key={test.id} className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50">
                           <td className="px-4 py-3 font-medium text-gray-900 dark:text-slate-100">{test.title}</td>
-                          <td className="px-4 py-3 text-gray-500 dark:text-slate-400">{test.cohort?.name ?? '—'}</td>
                           <td className="px-4 py-3 text-center text-gray-500 dark:text-slate-400">{assigned}</td>
                           <td className="px-4 py-3 text-center text-gray-500 dark:text-slate-400">
                             {test._count?.submissions ?? 0}
@@ -250,7 +272,7 @@ export function TeacherTestsPage() {
               >
                 <option value="">Выберите тест...</option>
                 {tests.map((t) => (
-                  <option key={t.id} value={t.id}>{t.title} ({t.cohort?.name})</option>
+                  <option key={t.id} value={t.id}>{t.title}</option>
                 ))}
               </select>
               {selectedTest && (
@@ -290,11 +312,11 @@ export function TeacherTestsPage() {
                         <td className="px-4 py-3">
                           {submittedIds.has(a.studentId) ? (
                             <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full">
-                              Сдан
+                              Завершён
                             </span>
                           ) : (
                             <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-2 py-0.5 rounded-full">
-                              Не сдан
+                              Назначен
                             </span>
                           )}
                         </td>
@@ -325,6 +347,21 @@ export function TeacherTestsPage() {
                 Назначить: {assigningTest.title}
               </h2>
               <button onClick={closeAssignModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-xl">×</button>
+            </div>
+
+            {/* Cohort selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Группа</label>
+              <select
+                value={assignCohortId}
+                onChange={(e) => { setAssignCohortId(e.target.value); setSelectedStudentIds([]); }}
+                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Выберите группу</option>
+                {cohorts.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
 
             {/* Variant selector */}
@@ -361,7 +398,9 @@ export function TeacherTestsPage() {
             {/* Students list (specific mode) */}
             {assignMode === 'students' && (
               <div>
-                {cohortStudents.length === 0 ? (
+                {!assignCohortId ? (
+                  <div className="text-sm text-gray-400 dark:text-slate-500 text-center py-4">Сначала выберите группу</div>
+                ) : cohortStudents.length === 0 ? (
                   <div className="text-sm text-gray-400 dark:text-slate-500 text-center py-4">Загрузка...</div>
                 ) : (
                   <div className="max-h-48 overflow-y-auto space-y-1 border border-gray-200 dark:border-slate-700 rounded-lg p-2">

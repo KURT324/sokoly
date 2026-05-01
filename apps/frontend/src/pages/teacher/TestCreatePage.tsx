@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext,
@@ -19,7 +19,6 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Layout } from '../../components/Layout';
 import { testsApi, ParsedQuestion } from '../../api/tests';
-import { cohortsApi, Cohort } from '../../api/cohorts';
 
 type QuestionType = 'SINGLE' | 'MULTIPLE' | 'OPEN_TEXT' | 'DRAWING';
 
@@ -235,9 +234,7 @@ function QuestionEditor({ question, onUpdate }: { question: QuestionForm; onUpda
 
 export function TestCreatePage() {
   const navigate = useNavigate();
-  const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [title, setTitle] = useState('');
-  const [cohortId, setCohortId] = useState('');
   const [timeLimitMin, setTimeLimitMin] = useState('');
   const [variants, setVariants] = useState<VariantForm[]>([defaultVariant(0)]);
   const [activeVariantIdx, setActiveVariantIdx] = useState(0);
@@ -251,13 +248,6 @@ export function TestCreatePage() {
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-
-  useEffect(() => {
-    cohortsApi.getCohorts().then((r) => {
-      setCohorts(r.data);
-      if (r.data.length === 1) setCohortId(r.data[0].id);
-    });
-  }, []);
 
   const activeVariant = variants[activeVariantIdx] ?? variants[0];
 
@@ -328,7 +318,6 @@ export function TestCreatePage() {
   const handleSave = async () => {
     setError('');
     if (!title.trim()) return setError('Введите название теста');
-    if (!cohortId) return setError('Выберите группу');
     if (variants.length === 0) return setError('Добавьте хотя бы один вариант');
 
     for (const v of variants) {
@@ -349,7 +338,6 @@ export function TestCreatePage() {
     try {
       await testsApi.createTest({
         title: title.trim(),
-        cohort_id: cohortId,
         time_limit_min: timeLimitMin ? Number(timeLimitMin) : undefined,
         variants: variants.map((v) => ({
           name: v.name,
@@ -395,32 +383,16 @@ export function TestCreatePage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Группа *</label>
-              <select
-                value={cohortId}
-                onChange={(e) => setCohortId(e.target.value)}
-                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Выберите группу</option>
-                {cohorts.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Лимит времени (мин, опционально)</label>
-              <input
-                type="number"
-                value={timeLimitMin}
-                onChange={(e) => setTimeLimitMin(e.target.value)}
-                placeholder="Без ограничений"
-                min={1}
-                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Лимит времени (мин, опционально)</label>
+            <input
+              type="number"
+              value={timeLimitMin}
+              onChange={(e) => setTimeLimitMin(e.target.value)}
+              placeholder="Без ограничений"
+              min={1}
+              className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
         </div>
 

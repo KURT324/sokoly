@@ -1,0 +1,1 @@
+ALTER TABLE tests ALTER COLUMN cohort_id DROP NOT NULL;

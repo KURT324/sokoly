@@ -39,7 +39,6 @@ export interface CohortStudent {
 export interface Test {
   id: string;
   title: string;
-  cohort_id: string;
   time_limit_min?: number | null;
   is_open: boolean;
   created_at: string;
@@ -51,13 +50,11 @@ export interface Test {
     manual_score?: number | null;
     submitted_at: string;
   }>;
-  cohort?: { id: string; name: string };
 }
 
 export interface StudentTestDetail {
   id: string;
   title: string;
-  cohort_id: string;
   time_limit_min?: number | null;
   created_at: string;
   assigned: boolean;

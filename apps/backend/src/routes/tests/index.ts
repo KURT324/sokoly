@@ -110,13 +110,12 @@ export async function testsRoutes(app: FastifyInstance) {
     });
   });
 
-  // POST /api/tests — create test (library entry, no day binding, no show_result, no student assignment)
+  // POST /api/tests — create test (library entry, no cohort, no day, no show_result)
   app.post('/', {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
-    const { title, cohort_id, time_limit_min, variants } = request.body as {
+    const { title, time_limit_min, variants } = request.body as {
       title: string;
-      cohort_id: string;
       time_limit_min?: number;
       variants: VariantInput[];
     };
@@ -124,7 +123,6 @@ export async function testsRoutes(app: FastifyInstance) {
     const test = await prisma.test.create({
       data: {
         title,
-        cohort_id,
         time_limit_min: time_limit_min || null,
         show_result_immediately: false,
         created_by_id: request.user!.id,
@@ -285,7 +283,6 @@ export async function testsRoutes(app: FastifyInstance) {
     const tests = await prisma.test.findMany({
       include: {
         _count: { select: { submissions: true } },
-        cohort: { select: { id: true, name: true } },
         variants: {
           select: {
             id: true,
@@ -315,7 +312,7 @@ export async function testsRoutes(app: FastifyInstance) {
     if (user.role === UserRole.STUDENT) {
       const test = await prisma.test.findUnique({
         where: { id },
-        select: { id: true, title: true, cohort_id: true, time_limit_min: true, created_at: true },
+        select: { id: true, title: true, time_limit_min: true, created_at: true },
       });
 
       if (!test) return reply.status(404).send({ error: 'Not Found' });
@@ -370,9 +367,8 @@ export async function testsRoutes(app: FastifyInstance) {
     preHandler: roleGuard(UserRole.TEACHER, UserRole.ADMIN),
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { title, cohort_id, time_limit_min, variants } = request.body as {
+    const { title, time_limit_min, variants } = request.body as {
       title: string;
-      cohort_id: string;
       time_limit_min?: number;
       variants: VariantInput[];
     };
@@ -389,7 +385,6 @@ export async function testsRoutes(app: FastifyInstance) {
       where: { id },
       data: {
         title,
-        cohort_id,
         time_limit_min: time_limit_min || null,
         variants: {
           create: variants.map((v) => ({
